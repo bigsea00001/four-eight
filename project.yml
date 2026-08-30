@@ -96,7 +96,6 @@ targets:
         NSLocalNetworkUsageDescription: "이 Mac이나 같은 네트워크의 다른 기기에서 도는 AI 서버(Ollama, LM Studio 등)에 연결할 때만 씁니다. 생년월일시와 해석은 사용자가 직접 지정한 주소로만 갑니다."
         LSApplicationCategoryType: public.app-category.lifestyle
         LSMinimumSystemVersion: "15.0"
-        NSHumanReadableCopyright: "© 2026 waylake. MIT License."
         NSSupportsAutomaticTermination: true
         NSSupportsSuddenTermination: false
     settings:
