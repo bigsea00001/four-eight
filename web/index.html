@@ -134,6 +134,41 @@
   .tl-yr { font-size:.66rem; color:var(--ink-faint); margin-top:.1rem; }
   .lotto { display:flex; gap:.5rem; flex-wrap:wrap; margin:.1rem 0 .2rem; }
   .lotto-ball { width:2.5rem; height:2.5rem; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-weight:700; color:#fff; font-size:1.1rem; text-shadow:0 1px 1px rgba(0,0,0,.25); box-shadow:inset -2px -3px 5px rgba(0,0,0,.22); }
+  /* AI 점술가 */
+  .cnote { font-size:.82rem; color:var(--ink-soft); background:var(--code-bg); border:1px solid var(--line); border-radius:10px; padding:.6rem .75rem; margin:.2rem 0 .8rem; line-height:1.55; }
+  .ctopics { display:flex; flex-wrap:wrap; gap:.4rem; margin-bottom:.8rem; }
+  .ctopic { font-size:.82rem; background:var(--surface); border:1px solid var(--line); border-radius:20px; padding:.3rem .8rem; cursor:pointer; color:var(--ink); }
+  .ctopic:hover { border-color:var(--cinnabar); }
+  .ctopic.on { background:var(--cinnabar); color:#fff; border-color:var(--cinnabar); }
+  .cbox { display:flex; flex-direction:column; gap:.5rem; max-height:26rem; overflow-y:auto; margin-bottom:.7rem; }
+  .cbox:empty { display:none; }
+  .cb { max-width:88%; padding:.55rem .8rem; border-radius:14px; font-size:.9rem; line-height:1.65; white-space:pre-wrap; }
+  .cb-me { align-self:flex-end; background:var(--cinnabar); color:#fff; border-bottom-right-radius:4px; }
+  .cb-ai { align-self:flex-start; background:var(--surface); border:1px solid var(--line); border-bottom-left-radius:4px; }
+  .cb-sys { align-self:center; background:transparent; color:var(--ink-soft); font-size:.82rem; }
+  .chotline { align-self:stretch; background:#fff6f5; border:1px solid var(--cinnabar); border-radius:12px; padding:.7rem .9rem; }
+  .chotline p { margin:.25rem 0; font-size:.9rem; line-height:1.6; }
+  .chotline p.num { font-weight:700; color:var(--cinnabar); }
+  .cinput { display:flex; gap:.5rem; align-items:flex-end; }
+  .cinput textarea { flex:1; resize:vertical; font:inherit; font-size:.9rem; padding:.55rem .7rem; border:1px solid var(--line); border-radius:10px; background:var(--paper); color:var(--ink); }
+  .cinput #csend { white-space:nowrap; padding:.6rem 1rem; border:0; border-radius:10px; background:var(--cinnabar); color:#fff; font-weight:600; cursor:pointer; }
+  .cinput #csend:disabled { opacity:.5; cursor:default; }
+  /* 전송 고지 모달 */
+  .cmodal-ov { position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; padding:1rem; z-index:100; }
+  .cmodal { background:var(--paper); border-radius:14px; max-width:30rem; width:100%; padding:1.3rem 1.4rem; max-height:90vh; overflow-y:auto; box-shadow:0 10px 40px rgba(0,0,0,.3); }
+  .cmodal h3 { margin:0 0 .5rem; font-size:1.05rem; }
+  .cm-lead { font-size:.86rem; color:var(--ink-soft); margin:0 0 .9rem; line-height:1.55; }
+  .cm-sec { margin-bottom:.8rem; }
+  .cm-h { font-size:.85rem; font-weight:700; margin-bottom:.3rem; }
+  .cm-h.go { color:var(--cinnabar); }
+  .cm-h.no { color:var(--ink-soft); }
+  .cmodal ul { margin:.2rem 0; padding-left:1.1rem; }
+  .cmodal li { font-size:.85rem; line-height:1.6; color:var(--ink); }
+  .cm-warn { font-size:.8rem; color:var(--ink-soft); background:var(--code-bg); border-radius:8px; padding:.5rem .65rem; margin:.6rem 0 1rem; line-height:1.5; }
+  .cm-btns { display:flex; gap:.6rem; justify-content:flex-end; }
+  .cm-btns button { padding:.55rem 1.1rem; border-radius:9px; font-weight:600; cursor:pointer; font-size:.9rem; }
+  .cm-cancel { background:transparent; border:1px solid var(--line); color:var(--ink); }
+  .cm-ok { background:var(--cinnabar); border:0; color:#fff; }
 </style>
 </head>
 <body>

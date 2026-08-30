@@ -287,6 +287,180 @@ function renderChart(c) {
 }
 
 // 탭 다섯을 그리고 전환을 붙인다. 오늘·이달·올해는 time 이 있을 때만.
+// ── AI 점술가 — 사주 상담 ────────────────────────────────────────────────
+// 사주 계산은 브라우저 안에서 끝납니다. 상담을 눌러야만, 계산된 명식 기호와
+// 적으신 고민만 서버로 갑니다(생년월일시 원본은 나가지 않습니다).
+// 위기 표현은 여기(브라우저)에서 먼저 걸러 서버를 부르지 않고 핫라인을 띄웁니다.
+const CHAT_URL = "https://secretary.seti.or.kr/vrof-chat/chat";
+const CONSENT_KEY = "saju_consult_consent_v1";
+
+const CONSULT_TOPICS = [
+  ["identity", "나와 성향"], ["career", "일과 진로"], ["wealth", "돈과 재물"],
+  ["relationship", "관계와 인연"], ["study", "배움과 자격"], ["people", "사람과 조직"],
+  ["expression", "표현과 창작"], ["wellbeing", "몸과 마음의 기운"],
+  ["movement", "이동과 거처"], ["timing", "지금 이 시기"],
+];
+
+// 위기 표현. 서버와 같은 목록을 브라우저에도 둡니다(1차 방어).
+const CRISIS_PHRASES = [
+  "죽고 싶", "죽고싶", "자살", "자해", "살기 싫", "사라지고 싶", "다 끝내고 싶",
+  "목을 매", "목을 맬", "손목을 그", "뛰어내리", "유서를 쓰", "유서를 남",
+  "약을 모으", "죽는 게 낫", "죽여버리고 싶",
+];
+function isCrisis(text) { return CRISIS_PHRASES.some(p => text.includes(p)); }
+const HOTLINE_LINES = [
+  "지금 많이 힘드신 것 같습니다. 이것은 사주로 풀 일이 아니라, 지금 바로 사람과 이야기하실 일입니다.",
+  "· 자살예방 상담전화 109 (24시간, 전화·문자)",
+  "· 정신건강 위기상담 1577-0199",
+  "· 청소년 전화 1388",
+  "혼자 견디지 않으셔도 됩니다. 지금 전화 한 통을 권합니다.",
+];
+
+const ohengLine = (c) => c.oheng.map(o => `${o.element}${o.count}`).join(" ");
+
+// 서버로 보낼 명식 근거 블록. 생년월일시 원본은 넣지 않습니다 — 계산된 기호만.
+function buildFacts(c, topicLabel) {
+  const L = ["[명식 사실]", "사주: " + c.compactHanja,
+    `일간: ${c.dayMasterKorean}(${c.dayMasterHanja}) ${c.dayMasterElement}·${c.dayMasterYinYang}`,
+    "오행 분포: " + ohengLine(c),
+    `신강약: ${c.strength} (세력비 ${c.strengthPercent}%)`];
+  if (c.sinsal && c.sinsal.length) L.push("신살: " + c.sinsal.join(" "));
+  if (c.voidPositions && c.voidPositions.length) L.push("공망: " + c.voidPositions.join(" "));
+  if (c.relations && c.relations.length) L.push("지지 관계: " + c.relations.join(", "));
+  L.push("", "[상담 주제] " + topicLabel);
+  if (c.sections && c.sections.length) {
+    L.push("", "[근거]");
+    c.sections.forEach(s => L.push(`- (${s.title}) ${s.text.replace(/\n/g, " ")}`));
+  }
+  return L.join("\n").slice(0, 3500);
+}
+
+function renderConsult(c) {
+  const chips = CONSULT_TOPICS.map(([k, label]) =>
+    `<button class="ctopic" data-k="${k}" data-label="${label}">${label}</button>`).join("");
+  return `<div class="block">
+    <div class="btitle">AI 점술가 <span class="lab">명식을 바탕으로 고민을 풀어 드립니다</span></div>
+    <div class="cnote">🔒 사주 계산은 이 기기 안에서 끝났습니다. 상담을 보내면 <b>계산된 명식 기호와 적으신 고민만</b> 서버로 갑니다. 생년월일시 원본은 나가지 않습니다.</div>
+    <div class="ctopics">${chips}</div>
+    <div class="cbox" id="cbox"></div>
+    <div class="cinput">
+      <textarea id="cq" rows="2" placeholder="주제를 고르고, 지금 걸리는 고민을 적어 주세요. (예: 지금 하는 일을 계속해야 할지 고민입니다)"></textarea>
+      <button id="csend">풀이 받기</button>
+    </div>
+    <div class="fine">AI가 작성하며 심리 치료나 전문 상담이 아닙니다. 주민번호·계좌·연락처 등 민감정보는 적지 마세요. 위급하시면 자살예방 상담전화 109.</div>
+  </div>`;
+}
+
+// 전송 고지 모달 — 한 번만 묻습니다. 동의하면 다음부터 바로 보냅니다.
+function askConsent() {
+  return new Promise((resolve) => {
+    if (localStorage.getItem(CONSENT_KEY) === "1") { resolve(true); return; }
+    const ov = document.createElement("div");
+    ov.className = "cmodal-ov";
+    ov.innerHTML = `<div class="cmodal">
+      <h3>상담 내용이 서버로 전송됩니다</h3>
+      <p class="cm-lead">사주 풀이를 위해 아래 내용만 AI 서버로 전송됩니다. 보내기 전에 확인해 주세요.</p>
+      <div class="cm-sec"><div class="cm-h go">전송되는 것</div>
+        <ul><li>계산이 끝난 명식 기호 (간지·오행·신강약·근거 규칙)</li><li>고르신 주제와 적으신 고민, 최근 대화</li></ul></div>
+      <div class="cm-sec"><div class="cm-h no">전송되지 않는 것 (이 기기에만 남습니다)</div>
+        <ul><li>이름·성별</li><li>생년월일시 원본 (양력·음력·출생 시각)</li><li>출생지, 진태양시 보정값</li></ul></div>
+      <p class="cm-warn">AI가 작성하며 심리 치료나 전문 상담이 아닙니다. 민감한 개인정보는 입력하지 마세요.</p>
+      <div class="cm-btns"><button class="cm-cancel">취소</button><button class="cm-ok">동의하고 풀이 받기</button></div>
+    </div>`;
+    document.body.appendChild(ov);
+    const close = (v) => { ov.remove(); resolve(v); };
+    ov.querySelector(".cm-cancel").onclick = () => close(false);
+    ov.querySelector(".cm-ok").onclick = () => { localStorage.setItem(CONSENT_KEY, "1"); close(true); };
+    ov.addEventListener("click", (e) => { if (e.target === ov) close(false); });
+  });
+}
+
+function cBubble(box, who, text) {
+  const d = document.createElement("div");
+  d.className = "cb cb-" + who;
+  d.textContent = text;
+  box.appendChild(d);
+  box.scrollTop = box.scrollHeight;
+  return d;
+}
+
+async function streamConsult(body, bubble) {
+  let cid = "", got = "";
+  const res = await fetch(CHAT_URL, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+  });
+  if (!res.ok || !res.body) throw new Error("서버 응답 오류 (" + res.status + ")");
+  const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = "";
+  for (;;) {
+    const { value, done } = await reader.read(); if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let i;
+    while ((i = buf.indexOf("\n\n")) >= 0) {
+      const chunk = buf.slice(0, i); buf = buf.slice(i + 2);
+      let ev = "", data = "";
+      chunk.split("\n").forEach(l => {
+        if (l.startsWith("event:")) ev = l.slice(6).trim();
+        else if (l.startsWith("data:")) data += l.slice(5).trim();
+      });
+      if (!data) continue;
+      let d; try { d = JSON.parse(data); } catch (e) { continue; }
+      if (d.conversation_id) cid = d.conversation_id;
+      if (ev === "delta" && d.text) { got += d.text; bubble.textContent = got; bubble.parentElement.scrollTop = bubble.parentElement.scrollHeight; }
+    }
+  }
+  return { cid, text: got };
+}
+
+function setupConsult(c, root) {
+  const panel = root.querySelector('[data-p="consult"]'); if (!panel) return;
+  const box = panel.querySelector("#cbox");
+  const q = panel.querySelector("#cq");
+  const send = panel.querySelector("#csend");
+  const topics = [...panel.querySelectorAll(".ctopic")];
+  let topicK = "", topicLabel = "", cid = "", busy = false;
+
+  topics.forEach(b => b.addEventListener("click", () => {
+    topics.forEach(x => x.classList.toggle("on", x === b));
+    topicK = b.dataset.k; topicLabel = b.dataset.label;
+  }));
+
+  async function go() {
+    if (busy) return;
+    const text = q.value.trim();
+    if (!text) { q.focus(); return; }
+    // 🔴 위기 표현: 서버를 부르지 않고 즉시 핫라인.
+    if (isCrisis(text)) {
+      cBubble(box, "me", text); q.value = "";
+      const card = document.createElement("div"); card.className = "chotline";
+      card.innerHTML = HOTLINE_LINES.map((l, i) => i === 0 || i === HOTLINE_LINES.length - 1
+        ? `<p>${l}</p>` : `<p class="num">${l}</p>`).join("");
+      box.appendChild(card); box.scrollTop = box.scrollHeight;
+      return;
+    }
+    if (!topicLabel) { cBubble(box, "sys", "먼저 위에서 상담 주제를 하나 골라 주세요."); return; }
+    const ok = await askConsent(); if (!ok) return;
+
+    busy = true; send.disabled = true;
+    cBubble(box, "me", text); q.value = "";
+    const bubble = cBubble(box, "ai", "…");
+    try {
+      const body = { tenant: "saju", message: text, locale: "ko",
+        context: buildFacts(c, topicLabel) };
+      if (cid) body.conversation_id = cid;
+      const r = await streamConsult(body, bubble);
+      if (r.cid) cid = r.cid;
+      if (!r.text) bubble.textContent = "잠시 답변이 어렵습니다. 잠시 뒤 다시 시도해 주세요.";
+    } catch (e) {
+      bubble.textContent = "연결에 실패했습니다. 잠시 뒤 다시 시도해 주세요.";
+    } finally {
+      busy = false; send.disabled = false;
+    }
+  }
+  send.addEventListener("click", go);
+  q.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) go(); });
+}
+
+
 function render(c) {
   const dm = `${c.dayMasterKorean}${c.dayMasterHanja}`;
   const t = c.time;
@@ -303,6 +477,7 @@ function render(c) {
   }
   add("chart", "명식", renderChart(c));
   if (t) add("daeun", "대운", renderDaeun(t));
+  add("consult", "AI 점술가", renderConsult(c));
 
   const el = $("result");
   el.innerHTML = `<div class="tabs">${tabs.join("")}</div>${panels.join("")}`;
@@ -317,6 +492,7 @@ function render(c) {
   buttons.forEach(b => b.addEventListener("click", () => activate(b.dataset.t)));
   // 기본 탭 — 시간운이 있으면 오늘, 없으면 명식.
   activate(t ? "today" : "chart");
+  setupConsult(c, el);
 }
 
 function showError(e) {
