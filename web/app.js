@@ -90,6 +90,43 @@ async function ensureLoaded() {
 
 const esc = (s) => String(s == null ? "" : s);
 
+// ── 재미로 보는 오늘의 행운 번호 ─────────────────────────────────────────
+// seed = 개인 명식 + 오늘 날짜. 같은 사람·같은 날이면 같은 번호가 나오고 날마다 바뀝니다.
+// 사주로 당첨을 맞출 수는 없습니다 — 오늘 일진에서 뽑은 재미 요소입니다.
+function hash32(str) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  return h >>> 0;
+}
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function luckyNumbers(seedStr) {
+  const rnd = mulberry32(hash32(seedStr));
+  const pool = []; for (let i = 1; i <= 45; i++) pool.push(i);
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    const tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
+  }
+  return pool.slice(0, 6).sort((a, b) => a - b);
+}
+// 실제 로또 공 색(번호대별)을 그대로 써서 재미를 살립니다.
+function lottoColor(n) {
+  return n <= 10 ? "#fbc400" : n <= 20 ? "#69c8f2" : n <= 30 ? "#ff7272" : n <= 40 ? "#aaaaaa" : "#b0d840";
+}
+function luckyBlock(personSeed, dateStr) {
+  const nums = luckyNumbers((personSeed || "") + "|" + dateStr);
+  const balls = nums.map(n => `<span class="lotto-ball" style="background:${lottoColor(n)}">${n}</span>`).join("");
+  return `<div class="block"><div class="btitle">재미로 보는 오늘의 행운 번호</div>
+    <div class="lotto">${balls}</div>
+    <div class="fine">사주로 당첨 번호를 맞출 수는 없습니다. 오늘 일진에서 뽑은 재미 요소이고, 날마다 바뀝니다.</div></div>`;
+}
+
 // 간지 두 글자(천간 위, 지지 아래)를 오행 색으로. size: "lg" | "md" | "sm".
 function ganjiBlock(cell, size = "md") {
   return `<div class="gj gj-${size}">` +
@@ -107,7 +144,7 @@ function cycleTile(label, cell, god, detail) {
 }
 
 // 오늘 — 일진.
-function renderToday(t, dayMaster) {
+function renderToday(t, dayMaster, personSeed) {
   const d = t.today;
   const chips = [
     `<span class="chip strong">${d.stemGod}의 기운</span>`,
@@ -152,6 +189,9 @@ function renderToday(t, dayMaster) {
     html += `<div class="block"><div class="btitle">오늘의 기운</div>
       <div class="sec-b">${sec.text.replace(/\n/g, "<br>")}</div></div>`;
   }
+
+  // 재미로 보는 오늘의 행운 번호.
+  html += luckyBlock(personSeed, d.date);
   return html;
 }
 
@@ -257,7 +297,7 @@ function render(c) {
     panels.push(`<div class="panel" data-p="${key}">${html}</div>`);
   };
   if (t) {
-    add("today", "오늘", renderToday(t, dm));
+    add("today", "오늘", renderToday(t, dm, c.compactHanja));
     add("month", "이달", renderPeriod(t, "month", dm));
     add("year", "올해", renderPeriod(t, "year", dm));
   }
