@@ -3,6 +3,9 @@
 //
 // wasm은 「사주 보기」를 누른 뒤에만 받습니다(지연 로딩). 소개 페이지(../index.html)에는
 // 이 코드가 실리지 않으므로, 소개 페이지 첫 로딩에 18MB가 딸려오지 않습니다.
+//
+// 화면은 다섯 탭입니다 — 오늘·이달·올해·명식·대운. 오늘 날짜는 서버가 아니라
+// 브라우저(new Date)가 wasm 인자(today=YYYY-MM-DD)로 넘깁니다. 계산은 전부 wasm 안에서.
 import { WASI, File, Directory, OpenFile, ConsoleStdout, PreopenDirectory }
   from "./vendor/index.js";
 
@@ -83,7 +86,115 @@ async function ensureLoaded() {
   showLoading(false);
 }
 
-function render(c) {
+// ── 렌더 조각들 ──────────────────────────────────────────────────────────
+
+const esc = (s) => String(s == null ? "" : s);
+
+// 간지 두 글자(천간 위, 지지 아래)를 오행 색으로. size: "lg" | "md" | "sm".
+function ganjiBlock(cell, size = "md") {
+  return `<div class="gj gj-${size}">` +
+    `<span class="gc hanja" style="color:${color(cell.stemElement)}">${cell.stemHanja}</span>` +
+    `<span class="gc hanja" style="color:${color(cell.branchElement)}">${cell.branchHanja}</span>` +
+    `</div>`;
+}
+
+// 대운·세운·월운 한 칸.
+function cycleTile(label, cell, god, detail) {
+  return `<div class="cyc">
+    <div class="cyc-l">${label}</div>
+    <div class="cyc-b">${ganjiBlock(cell, "sm")}<div class="cyc-t"><b>${god}</b><span>${detail}</span></div></div>
+  </div>`;
+}
+
+// 오늘 — 일진.
+function renderToday(t, dayMaster) {
+  const d = t.today;
+  const chips = [
+    `<span class="chip strong">${d.stemGod}의 기운</span>`,
+    `<span class="chip">${d.stage}</span>`,
+  ];
+  if (d.isVoid) chips.push(`<span class="chip">공망</span>`);
+  if (d.combinesDayMaster) chips.push(`<span class="chip">일간과 합</span>`);
+
+  let html = `<div class="today-head block">
+    <div class="today-gj">${ganjiBlock(d.cell, "lg")}</div>
+    <div class="today-info">
+      <div class="today-title hanja">${d.date} · ${d.cell.ganjiKorean}일</div>
+      <div class="chips">${chips.join("")}</div>
+      <div class="sub-note">일간 ${dayMaster} 기준 · 천간 ${d.stemGod} · 지지 ${d.branchGod} · 십이운성 ${d.stage}</div>
+    </div>
+  </div>`;
+
+  // 대운·세운·월운 띠.
+  const band = [];
+  const cur = (t.daeun && t.daeun.currentIndex != null)
+    ? t.daeun.periods.find(p => p.index === t.daeun.currentIndex) : null;
+  if (cur) band.push(cycleTile("대운", cur.cell, cur.stemGod, `${cur.startAge}세~`));
+  band.push(cycleTile("세운", t.year.cell, t.year.stemGod, t.year.label));
+  band.push(cycleTile("월운", t.month.cell, t.month.stemGod, t.month.label));
+  html += `<div class="cyc-band">${band.join("")}</div>`;
+
+  // 명식과 만나는 지점.
+  const contacts = [];
+  d.relations.forEach(r => contacts.push(
+    `<span class="chip ${r.kind === "충" ? "strong" : "rel"}">${r.display} · ${r.position}</span>`));
+  if (d.isVoid) contacts.push(`<span class="chip">일주 공망에 해당</span>`);
+  if (d.combinesDayMaster) contacts.push(`<span class="chip">${dayMaster}${d.cell.stemKorean} 천간합</span>`);
+  if (contacts.length) {
+    html += `<div class="block"><div class="btitle">명식과 만나는 지점</div>
+      <div class="chips">${contacts.join("")}</div>
+      <div class="fine">충과 형은 좋고 나쁨이 아니라 움직임과 조정이 생기는 국면을 뜻합니다.</div></div>`;
+  }
+
+  // 오늘의 기운 해석(근거 규칙).
+  const sec = (t.sections || []).find(s => s.title === "오늘의 기운");
+  if (sec) {
+    html += `<div class="block"><div class="btitle">오늘의 기운</div>
+      <div class="sec-b">${sec.text.replace(/\n/g, "<br>")}</div></div>`;
+  }
+  return html;
+}
+
+// 이달 / 올해 — 월운·세운. kind: "month" | "year".
+function renderPeriod(t, kind, dayMaster) {
+  const p = kind === "month" ? t.month : t.year;
+  const heading = kind === "month" ? "이달 · 월운" : "올해 · 세운";
+  let html = `<div class="today-head block">
+    <div class="today-gj">${ganjiBlock(p.cell, "lg")}</div>
+    <div class="today-info">
+      <div class="today-title hanja">${p.label} · ${p.cell.ganjiKorean}(${p.cell.ganjiHanja})</div>
+      <div class="chips"><span class="chip strong">${p.stemGod}</span><span class="chip">지지 ${p.branchGod}</span></div>
+      <div class="sub-note">${heading} · 일간 ${dayMaster} 기준</div>
+    </div>
+  </div>`;
+  const sec = (t.sections || []).find(s => s.title === "이달과 올해");
+  if (sec) {
+    html += `<div class="block"><div class="btitle">이달과 올해</div>
+      <div class="sec-b">${sec.text.replace(/\n/g, "<br>")}</div></div>`;
+  }
+  return html;
+}
+
+// 대운 — 10년 단위 흐름 타임라인.
+function renderDaeun(t) {
+  const dae = t.daeun;
+  if (!dae) return `<div class="block">대운을 계산할 수 없습니다(출생 정보 부족).</div>`;
+  let head = `<div class="btitle">대운 <span class="lab">${dae.isForward ? "순행" : "역행"} · 대운수 ${dae.daeunSu} · 만 ${dae.ageYears}세</span></div>`;
+  const tiles = dae.periods.map(p => {
+    const on = p.isCurrent ? " on" : "";
+    return `<div class="tl${on}">
+      <div class="tl-age">${p.startAge}세</div>
+      ${ganjiBlock(p.cell, "sm")}
+      <div class="tl-god">${p.stemGod}</div>
+      <div class="tl-yr">${p.startYear}</div>
+    </div>`;
+  }).join("");
+  return `<div class="block">${head}<div class="tl-row">${tiles}</div>
+    <div class="fine">현재 대운을 주황으로 표시했습니다. 대운은 10년 단위로 바뀌는 큰 흐름입니다.</div></div>`;
+}
+
+// 명식 — 기존 화면 그대로.
+function renderChart(c) {
   const corr = [];
   corr.push(`진태양시 <b>${c.solarTime}</b>`);
   corr.push(`경도보정 ${c.longitudeCorrectionMinutes.toFixed(1)}분`);
@@ -132,9 +243,40 @@ function render(c) {
   } else if (c.rulesError) {
     html += `<div class="block">규칙 로드 실패: ${c.rulesError}</div>`;
   }
+  return html;
+}
 
-  $("result").innerHTML = html;
-  $("result").hidden = false;
+// 탭 다섯을 그리고 전환을 붙인다. 오늘·이달·올해는 time 이 있을 때만.
+function render(c) {
+  const dm = `${c.dayMasterKorean}${c.dayMasterHanja}`;
+  const t = c.time;
+  const tabs = [];
+  const panels = [];
+  const add = (key, label, html) => {
+    tabs.push(`<button class="tab" data-t="${key}">${label}</button>`);
+    panels.push(`<div class="panel" data-p="${key}">${html}</div>`);
+  };
+  if (t) {
+    add("today", "오늘", renderToday(t, dm));
+    add("month", "이달", renderPeriod(t, "month", dm));
+    add("year", "올해", renderPeriod(t, "year", dm));
+  }
+  add("chart", "명식", renderChart(c));
+  if (t) add("daeun", "대운", renderDaeun(t));
+
+  const el = $("result");
+  el.innerHTML = `<div class="tabs">${tabs.join("")}</div>${panels.join("")}`;
+  el.hidden = false;
+
+  const buttons = [...el.querySelectorAll(".tab")];
+  const pans = [...el.querySelectorAll(".panel")];
+  const activate = (key) => {
+    buttons.forEach(b => b.classList.toggle("active", b.dataset.t === key));
+    pans.forEach(p => p.classList.toggle("on", p.dataset.p === key));
+  };
+  buttons.forEach(b => b.addEventListener("click", () => activate(b.dataset.t)));
+  // 기본 탭 — 시간운이 있으면 오늘, 없으면 명식.
+  activate(t ? "today" : "chart");
 }
 
 function showError(e) {
@@ -144,10 +286,17 @@ function showError(e) {
   box.innerHTML = `<b>계산 실패${PATCH ? "" : " (우회 꺼짐)"}</b><br>${String(e && e.stack || e)}`;
 }
 
+// 오늘 날짜(브라우저 로컬)를 YYYY-MM-DD 로. 서버로 나가지 않고 wasm 인자로만 들어간다.
+function todayArg() {
+  const now = new Date();
+  return `today=${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+}
+
 function readForm() {
   const h = $("h").value.trim() === "" ? "-" : $("h").value.trim();
   const argv = [$("y").value, $("mo").value, $("d").value, h, $("mi").value || "0", $("g").value, "/rules/rules.json"];
   if ($("cal").value === "음력") argv.push("음력");
+  argv.push(todayArg());
   return argv;
 }
 
@@ -171,11 +320,16 @@ async function calculate() {
 
 $("go").addEventListener("click", calculate);
 
-// 자동 실행(헤드리스 스크린샷용). ?auto=1&y=&mo=&d=&h=&mi=&g=&cal=
+// 자동 실행(헤드리스 스크린샷용). ?auto=1&y=&mo=&d=&h=&mi=&g=&cal=&tab=
 if (params.get("auto") === "1") {
   const set = (id, key, def) => { const v = params.get(key); $(id).value = v != null ? v : def; };
   set("y","y","2003"); set("mo","mo","2"); set("d","d","22"); set("h","h","13"); set("mi","mi","13");
   if (params.get("g")) $("g").value = params.get("g");
   if (params.get("cal")) $("cal").value = params.get("cal");
-  addEventListener("load", calculate);
+  addEventListener("load", async () => {
+    await calculate();
+    // ?tab=today|month|year|chart|daeun 로 특정 탭을 연다.
+    const tab = params.get("tab");
+    if (tab) { const b = document.querySelector(`.tab[data-t="${tab}"]`); if (b) b.click(); }
+  });
 }

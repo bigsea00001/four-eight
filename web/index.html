@@ -99,13 +99,46 @@
   .sec { margin-bottom:.8rem; }
   .sec-t { font-family:"AppleMyungjo","Nanum Myeongjo",serif; font-size:.92rem; font-weight:600; color:var(--cinnabar); margin-bottom:.25rem; }
   .sec-b { font-size:.9rem; line-height:1.65; color:var(--ink); }
+  /* 탭 — 오늘·이달·올해·명식·대운 */
+  .tabs { display:flex; gap:.3rem; flex-wrap:wrap; margin:.2rem 0 1rem; border-bottom:1px solid var(--line); }
+  .tab { appearance:none; background:none; border:0; border-bottom:2px solid transparent;
+    color:var(--ink-soft); font-size:.95rem; padding:.5rem .8rem; cursor:pointer; font-family:inherit; margin-bottom:-1px; }
+  .tab:hover { color:var(--ink); }
+  .tab.active { color:var(--cinnabar); border-bottom-color:var(--cinnabar); font-weight:650; }
+  .panel { display:none; } .panel.on { display:block; }
+  /* 간지 두 글자 블록(천간 위·지지 아래, 오행 색) */
+  .gj { display:inline-flex; flex-direction:column; align-items:center; line-height:1.05; padding:.3rem .55rem; border-radius:10px; background:var(--code-bg); }
+  .gj .gc { font-weight:600; }
+  .gj-lg .gc { font-size:2.6rem; } .gj-md .gc { font-size:1.6rem; } .gj-sm .gc { font-size:1.35rem; }
+  /* 오늘·이달·올해 머리 카드 */
+  .today-head { display:flex; gap:1rem; align-items:center; }
+  .today-gj { flex:none; }
+  .today-info { display:flex; flex-direction:column; gap:.45rem; }
+  .today-title { font-size:1.15rem; font-weight:600; }
+  .sub-note { font-size:.78rem; color:var(--ink-soft); }
+  .fine { font-size:.74rem; color:var(--ink-faint); margin-top:.55rem; }
+  /* 대운·세운·월운 띠 */
+  .cyc-band { display:flex; gap:.6rem; margin-top:.9rem; flex-wrap:wrap; }
+  .cyc { flex:1; min-width:8rem; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:.7rem; }
+  .cyc-l { font-size:.72rem; color:var(--ink-faint); margin-bottom:.4rem; }
+  .cyc-b { display:flex; gap:.5rem; align-items:center; }
+  .cyc-t { display:flex; flex-direction:column; line-height:1.3; }
+  .cyc-t b { font-size:.9rem; font-weight:600; } .cyc-t span { font-size:.72rem; color:var(--ink-soft); }
+  /* 대운 타임라인 */
+  .tl-row { display:flex; gap:.4rem; overflow-x:auto; padding:.3rem 0 .5rem; }
+  .tl { flex:none; text-align:center; padding:.5rem .55rem; border-radius:10px; border:1.2px solid transparent; background:color-mix(in srgb, var(--ink) 5%, var(--surface)); }
+  .tl.on { background:color-mix(in srgb, var(--cinnabar) 12%, var(--surface)); border-color:color-mix(in srgb, var(--cinnabar) 55%, var(--line)); }
+  .tl-age { font-size:.72rem; color:var(--ink-faint); margin-bottom:.3rem; }
+  .tl-god { font-size:.75rem; color:var(--ink-soft); margin-top:.3rem; }
+  .tl.on .tl-god { color:var(--cinnabar); font-weight:600; }
+  .tl-yr { font-size:.66rem; color:var(--ink-faint); margin-top:.1rem; }
 </style>
 </head>
 <body>
 <div class="bar"><span class="mark hanja">四八</span><span class="name">FourEight</span><a href="mac/">원본 macOS 앱 →</a></div>
 <main>
   <h1>사주 명식</h1>
-  <div class="sub">생년월일시를 넣으면 네 기둥과 해석이 나옵니다.</div>
+  <div class="sub">생년월일시를 넣으면 오늘·이달·올해·명식·대운을 탭으로 봅니다.</div>
   <div class="privacy">🔒 계산은 전부 이 브라우저 안(WebAssembly)에서 일어납니다. 생년월일시는 서버로 전송되지 않습니다. 서버에서 받는 것은 계산 엔진과 규칙 파일뿐입니다.</div>
 
   <div class="form">

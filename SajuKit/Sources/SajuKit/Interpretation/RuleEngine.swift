@@ -32,15 +32,26 @@ public struct RuleSet: Sendable {
         self.byTag = index
     }
 
-    /// 번들 리소스(rules.json) 로드.
+    /// rules.json 바이트에서 직접 로드.
+    ///
+    /// `bundled()`와 갈라 둔 이유는 브라우저입니다. wasm에는 파일시스템이 없고,
+    /// SwiftPM이 만들어 주는 `Bundle.module`은 **빌드한 기계의 절대 경로**를 그대로
+    /// 기억합니다. 게다가 못 찾으면 던지지 않고 그 자리에서 죽습니다(fatalError) —
+    /// `do/catch`로 감싸도 소용이 없습니다. 그래서 wasm에서는 규칙 바이트를
+    /// 바깥에서 받아 넣습니다. 나가는 것은 규칙 파일뿐이고 생년월일시는 여전히
+    /// 이 기계를 벗어나지 않습니다.
+    public static func load(from data: Data) throws -> RuleSet {
+        struct File: Codable { let version: Int; let rules: [Rule] }
+        let decoded = try JSONDecoder().decode(File.self, from: data)
+        return RuleSet(rules: decoded.rules, version: decoded.version)
+    }
+
+    /// 번들 리소스(rules.json) 로드. 맥 앱이 쓰는 길입니다.
     public static func bundled() throws -> RuleSet {
         guard let url = Bundle.module.url(forResource: "rules", withExtension: "json") else {
             throw CocoaError(.fileNoSuchFile)
         }
-        let data = try Data(contentsOf: url)
-        struct File: Codable { let version: Int; let rules: [Rule] }
-        let decoded = try JSONDecoder().decode(File.self, from: data)
-        return RuleSet(rules: decoded.rules, version: decoded.version)
+        return try load(from: Data(contentsOf: url))
     }
 
     public func matching(tag: String) -> [Rule] {
