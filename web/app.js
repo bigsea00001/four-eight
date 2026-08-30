@@ -445,7 +445,7 @@ function setupConsult(c, root) {
     const bubble = cBubble(box, "ai", "…");
     try {
       const body = { tenant: "saju", message: text, locale: "ko",
-        context: buildFacts(c, topicLabel) };
+        context: buildFacts(c, topicLabel), page_url: location.href };
       if (cid) body.conversation_id = cid;
       const r = await streamConsult(body, bubble);
       if (r.cid) cid = r.cid;
