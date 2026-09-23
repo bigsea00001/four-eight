@@ -169,11 +169,32 @@
   .cm-btns button { padding:.55rem 1.1rem; border-radius:9px; font-weight:600; cursor:pointer; font-size:.9rem; }
   .cm-cancel { background:transparent; border:1px solid var(--line); color:var(--ink); }
   .cm-ok { background:var(--cinnabar); border:0; color:#fff; }
+  /* 1년 이용권 */
+  #pass { margin-bottom:1rem; }
+  .pass-card { margin-top:0; }
+  .pass-exp { font-size:.9rem; margin-bottom:.6rem; }
+  .pass-code-row { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
+  .pass-code { font:600 1.05rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing:.04em;
+    background:var(--code-bg); border:1px solid var(--line); border-radius:8px; padding:.45rem .7rem;
+    word-break:break-all; user-select:all; }
+  .pass-keep { font-size:.82rem; color:var(--ink-soft); margin-top:.7rem; line-height:1.55; }
+  .pass-keep.strong { color:var(--cinnabar); font-weight:600; }
+  .pass-btn { margin-top:.8rem; background:var(--cinnabar); color:#fff; border:0; border-radius:9px;
+    padding:.6rem 1.2rem; font-size:.95rem; font-weight:600; cursor:pointer; font-family:inherit; }
+  .pass-btn:disabled, .pass-btn-ghost:disabled { opacity:.5; cursor:default; }
+  .pass-btn-ghost { background:transparent; border:1px solid var(--line); color:var(--ink); border-radius:8px;
+    padding:.45rem .9rem; font-size:.88rem; cursor:pointer; font-family:inherit; }
+  .pass-enter { margin-top:1rem; padding-top:.8rem; border-top:1px solid var(--line); }
+  .pass-enter .lab { display:block; margin-bottom:.35rem; }
+  .pass-input { flex:1; min-width:10rem; font:1rem ui-monospace, SFMono-Regular, Menlo, monospace; padding:.45rem .6rem;
+    border:1px solid var(--line); border-radius:8px; background:var(--paper); color:var(--ink); }
+  .pass-msg:empty, .pass-status:empty { display:none; }
 </style>
 </head>
 <body>
-<div class="bar"><span class="mark hanja">四八</span><span class="name">FourEight</span></div>
+<div class="bar"><span class="mark hanja">四八</span><span class="name">FourEight</span><a href="#pass" id="passlink" aria-controls="pass" aria-expanded="false" hidden>1년 이용권</a></div>
 <main>
+  <div id="pass" hidden></div>
   <h1>사주 명식</h1>
   <div class="sub">생년월일시를 넣으면 오늘·이달·올해·명식·대운을 탭으로 봅니다.</div>
   <div class="privacy">🔒 계산은 전부 이 브라우저 안(WebAssembly)에서 일어납니다. 생년월일시는 서버로 전송되지 않습니다. 서버에서 받는 것은 계산 엔진과 규칙 파일뿐입니다.</div>
@@ -195,5 +216,6 @@
   <div id="result" hidden></div>
 </main>
 <script type="module" src="app.js"></script>
+<script type="module" src="pass.js"></script>
 </body>
 </html>
