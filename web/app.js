@@ -385,7 +385,7 @@ function cBubble(box, who, text) {
 }
 
 async function streamConsult(body, bubble) {
-  let cid = "", got = "";
+  let cid = "", got = "", flags = {};
   const res = await fetch(CHAT_URL, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
   });
@@ -406,9 +406,10 @@ async function streamConsult(body, bubble) {
       let d; try { d = JSON.parse(data); } catch (e) { continue; }
       if (d.conversation_id) cid = d.conversation_id;
       if (ev === "delta" && d.text) { got += d.text; bubble.textContent = got; bubble.parentElement.scrollTop = bubble.parentElement.scrollHeight; }
+      if (ev === "done") flags = d;
     }
   }
-  return { cid, text: got };
+  return { cid, text: got, flags };
 }
 
 function setupConsult(c, root) {
@@ -447,8 +448,13 @@ function setupConsult(c, root) {
       const body = { tenant: "saju", message: text, locale: "ko",
         context: buildFacts(c, topicLabel), page_url: location.href };
       if (cid) body.conversation_id = cid;
+      // 1년 이용권 코드(pass.js 가 저장해 둔 것). 서버가 이용권을 요구할 때만 쓴다.
+      let passCode = null; try { passCode = localStorage.getItem("fe_pass_code"); } catch (e) { /* 막힌 창 */ }
+      if (passCode) body.pass_code = passCode;
       const r = await streamConsult(body, bubble);
       if (r.cid) cid = r.cid;
+      // 서버가 이용권을 요구하면 이용권 상자를 연다(pass.js 가 받는다).
+      if (r.flags && r.flags.need_pass) dispatchEvent(new CustomEvent("fe-pass:need"));
       if (!r.text) bubble.textContent = "잠시 답변이 어렵습니다. 잠시 뒤 다시 시도해 주세요.";
     } catch (e) {
       bubble.textContent = "연결에 실패했습니다. 잠시 뒤 다시 시도해 주세요.";

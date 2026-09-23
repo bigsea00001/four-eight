@@ -253,15 +253,23 @@ if (returned && addClaim(returned)) {
 }
 
 const owned = !!ownedCode(), pending = claims().length > 0, waiting = waitingClaims().length > 0;
+link.addEventListener("click", (e) => { e.preventDefault(); if (box.hidden) draw(); open(box.hidden); });
 if (BUY_OPEN || owned || pending) {
   link.hidden = false;
   link.textContent = owned ? "이용권" : "1년 이용권";
-  link.addEventListener("click", (e) => { e.preventDefault(); if (box.hidden) draw(); open(box.hidden); });
   draw();
   open(!!returned || waiting);
   // 기다리는 화면이 끝난 찾기표도 열 때마다 한 번 조용히 묻는다 — 늦게 확인된 결제를 위해.
   if (pending && !waiting) checkClaims();
 }
+
+// AI 점술가가 「이용권이 필요하다」고 답하면 상자를 열어 위로 올린다(app.js 가 보낸다).
+addEventListener("fe-pass:need", () => {
+  link.hidden = false;
+  draw();
+  open(true);
+  box.scrollIntoView({ behavior: "smooth", block: "start" });
+});
 
 // 다른 탭에서 코드를 받으면 이 탭도 따라 바꾼다.
 addEventListener("storage", (e) => {
