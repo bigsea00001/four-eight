@@ -1,0 +1,41 @@
+/* 이용약관 · 환불 규정 · 개인정보처리방침 — index.html 과 같은 색 토큰을 쓴다. */
+:root {
+  --paper:#FAF7F0; --surface:#FFFFFF; --ink:#2A251F; --ink-soft:#6B6154;
+  --ink-faint:#9A9083; --line:#E2D9C9; --cinnabar:#B43A2E; --code-bg:#ECE5D8;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper:#1B1917; --surface:#262320; --ink:#E8E1D6; --ink-soft:#ABA294;
+    --ink-faint:#7C7365; --line:#3A352F; --cinnabar:#D05A48; --code-bg:#302B26;
+  }
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--paper); color:var(--ink);
+  font:16px/1.75 -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", system-ui, sans-serif;
+  word-break:keep-all; overflow-wrap:break-word; }
+.bar { display:flex; align-items:center; gap:.6rem; max-width:46rem; margin:0 auto;
+  padding:1rem 1.25rem; font-size:.85rem; color:var(--ink-soft); }
+.bar .mark { font-family:"AppleMyungjo","Nanum Myeongjo",serif; font-size:1.2rem; color:var(--cinnabar); letter-spacing:.08em; text-decoration:none; }
+.bar .name { font-weight:650; color:var(--ink); text-decoration:none; }
+main { max-width:46rem; margin:0 auto; padding:0 1.25rem 3rem; }
+h1 { font-family:"AppleMyungjo","Nanum Myeongjo",serif; font-size:1.6rem; margin:.4rem 0 .1rem; }
+.effective { color:var(--ink-faint); font-size:.85rem; margin:0 0 1.1rem; }
+.callout { background:var(--surface); border:1px solid var(--line); border-left:3px solid var(--cinnabar);
+  border-radius:10px; padding:.8rem 1rem; font-size:.95rem; margin-bottom:1.2rem; }
+h2 { font-size:1.02rem; margin:1.6rem 0 .4rem; }
+h3 { font-size:.95rem; margin:1.1rem 0 .3rem; color:var(--ink-soft); }
+p, li { font-size:.95rem; }
+ul, ol { padding-left:1.2rem; margin:.3rem 0; }
+li { margin:.2rem 0; }
+a { color:var(--cinnabar); }
+.table-wrap { overflow-x:auto; }
+table { width:100%; border-collapse:collapse; background:var(--surface); border:1px solid var(--line);
+  border-radius:10px; overflow:hidden; font-size:.9rem; }
+th, td { text-align:left; padding:.5rem .7rem; border-top:1px solid var(--line); vertical-align:top; }
+thead th { background:var(--code-bg); color:var(--ink-soft); font-weight:600; border-top:0; }
+.note { color:var(--ink-soft); font-size:.85rem; }
+.bizinfo img { display:block; max-width:100%; height:auto; margin-top:.4rem; }
+footer { max-width:46rem; margin:0 auto; padding:1.2rem 1.25rem 2.5rem; border-top:1px solid var(--line);
+  font-size:.82rem; color:var(--ink-soft); }
+footer a { color:var(--ink-soft); }

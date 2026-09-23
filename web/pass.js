@@ -9,7 +9,7 @@
 // 결제 뒤 창을 닫은 사람은 코드를 받을 길이 없다.
 
 const API = "/api/pass";
-const K_CLAIMS = "fe_pass_claims", K_CODE = "fe_pass_code", K_EXP = "fe_pass_exp";
+const K_CLAIMS = "fe_pass_claims", K_CODE = "fe_pass_code", K_EXP = "fe_pass_exp", K_RCPT = "fe_pass_receipt";
 const POLL_MS = 30000;
 // 결제 확인을 기다리는 화면은 이 시간까지만 띄운다(결제창 만료 15분 + 블록 확인).
 // 그 뒤로도 찾기표는 지우지 않고 열 때마다 조용히 확인한다 — 늦게 확인되는 결제가 있다.
@@ -82,9 +82,18 @@ function renderOwned(code, exp, fresh) {
   row.append(c, copy);
   b.append(row);
 
+  // 구매 확인서(전자상거래법 제13조 — 계약 내용을 적은 전자 문서). 결제해서 받은 코드에만 있다.
+  const rc = receipt(code);
+  if (rc) {
+    b.append(el("div", "pass-rcpt", `결제 번호 ${rc.invoice_id} · ${Number(rc.amount_krw).toLocaleString("ko-KR")}원 · 결제 확인 ${ymd(rc.settled_at)}`));
+    const save = el("button", "pass-btn-ghost pass-save", "구매 확인서 저장");
+    save.addEventListener("click", () => saveReceipt(code, exp, rc));
+    b.append(save);
+  }
+
   const keep = el("div", fresh ? "pass-keep strong" : "pass-keep",
     "이 코드가 이용권입니다. 다른 기기나 브라우저에서는 이 코드를 넣으면 됩니다. " +
-    "잃어버리면 다시 찾을 수 없으니 따로 적어 두세요.");
+    "따로 적어 두세요. 잃어버리셨다면 결제에 쓴 비트코인 거래 번호로 다시 찾아 드립니다.");
   b.append(keep);
   box.append(b);
 }
@@ -119,6 +128,12 @@ function renderShop(message) {
     const buy = el("button", "pass-btn", "비트코인으로 결제하기");
     buy.addEventListener("click", () => startCheckout(buy));
     b.append(buy);
+    // 결제 «전»에 보여야 하는 것 — 약관·환불 규정(전자상거래법 표시 사항). 링크는 새 탭으로 연다(상자가 닫히지 않게).
+    const agree = el("div", "pass-agree");
+    const a1 = el("a", "", "이용약관"); a1.href = "terms.html"; a1.target = "_blank";
+    const a2 = el("a", "", "환불 규정"); a2.href = "refund.html"; a2.target = "_blank";
+    agree.append("결제하면 ", a1, "과 ", a2, "에 동의한 것으로 봅니다. 결제가 확인되고 7일 안에는 이유를 묻지 않고 전액 환불해 드립니다. 하루 10건 · 한 달 100건까지 질문할 수 있습니다. 14세 미만은 이용할 수 없습니다.");
+    b.append(agree);
   } else {
     b.append(el("div", "btitle", "1년 이용권"));
   }
@@ -142,6 +157,37 @@ function renderShop(message) {
   msg.id = "pass-msg";
   b.append(msg);
   box.append(b);
+}
+
+function receipt(code) {
+  try { const r = JSON.parse(store.get(K_RCPT) || "null"); return r && r.code === code ? r : null; } catch (e) { return null; }
+}
+
+// 판매자 정보는 공개 정보만 싣는다. 이메일은 여기서 조립한다 — 이 파일 원문에 @ 주소를 두지 않는다.
+function saveReceipt(code, exp, rc) {
+  const mail = ["contact", "vrof.co.kr"].join("@");
+  const lines = [
+    "구매 확인서 — FourEight 사주(fe.eet.kr) 1년 이용권", "",
+    "상품        AI 점술가 1년 이용권 (하루 10건 · 한 달 100건)",
+    `금액        ${Number(rc.amount_krw).toLocaleString("ko-KR")}원 (부가가치세 포함) · 비트코인 결제`,
+    `결제 번호   ${rc.invoice_id}`,
+    `결제 확인   ${rc.settled_at}`,
+    `이용 기간   ${ymd(rc.settled_at)} ~ ${ymd(exp)}`,
+    `이용권 코드 ${code}`, "",
+    "환불        결제 확인 후 7일 안에는 이유를 묻지 않고 전액 환불합니다.",
+    "            https://fe.eet.kr/refund.html",
+    "약관        https://fe.eet.kr/terms.html", "",
+    "판매자      주식회사 브이로프 · 사업자등록번호 433-88-02526",
+    "            통신판매업 신고번호 제2024-서울은평-0124호",
+    "            서울특별시 은평구 은평로13길 11-6, 303호",
+    `            070-8246-9001 · ${mail}`,
+  ];
+  const blob = new Blob([lines.join("\n") + "\n"], { type: "text/plain;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `fe-eet-kr-구매확인서-${rc.invoice_id}.txt`;
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
 const say = (id, text) => { const e = document.getElementById(id); if (e) e.textContent = text; };
@@ -199,6 +245,7 @@ async function checkClaims() {
     if (d.status === "ready") {
       dropClaim(c.t);
       if (!store.set(K_CODE, d.code) || !store.set(K_EXP, d.expires_at)) memCode = { code: d.code, exp: d.expires_at };
+      if (d.invoice_id) store.set(K_RCPT, JSON.stringify({ code: d.code, invoice_id: d.invoice_id, amount_krw: d.amount_krw, settled_at: d.settled_at }));
       stopPolling();
       renderOwned(d.code, d.expires_at, true);
       link.textContent = "이용권";

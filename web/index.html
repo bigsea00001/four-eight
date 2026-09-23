@@ -189,6 +189,16 @@
   .pass-input { flex:1; min-width:10rem; font:1rem ui-monospace, SFMono-Regular, Menlo, monospace; padding:.45rem .6rem;
     border:1px solid var(--line); border-radius:8px; background:var(--paper); color:var(--ink); }
   .pass-msg:empty, .pass-status:empty { display:none; }
+  .pass-agree { font-size:.78rem; color:var(--ink-soft); margin-top:.55rem; }
+  .pass-rcpt { font-size:.8rem; color:var(--ink-soft); margin-top:.6rem; }
+  .pass-save { margin-top:.45rem; font-size:.8rem; padding:.3rem .7rem; }
+  .pass-agree a { color:var(--ink-soft); }
+  /* 사업자 정보 — 이미지로 싣는다(봇 수집 방지 · vrof.co.kr 과 같은 방식). tools/bizinfo/ 가 만든다. */
+  .site-foot { max-width:46rem; margin:0 auto; padding:1.4rem 1.25rem 2.5rem; border-top:1px solid var(--line);
+    font-size:.8rem; color:var(--ink-soft); }
+  .site-foot nav { display:flex; flex-wrap:wrap; gap:.3rem .9rem; margin-bottom:.8rem; }
+  .site-foot a { color:var(--ink-soft); }
+  .site-foot img { display:block; max-width:100%; height:auto; }
 </style>
 </head>
 <body>
@@ -215,6 +225,14 @@
   <div id="error" hidden></div>
   <div id="result" hidden></div>
 </main>
+<footer class="site-foot">
+  <nav><a href="terms.html">이용약관</a><a href="refund.html">환불 규정</a><a href="privacy.html"><b>개인정보처리방침</b></a></nav>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/bizinfo-dark.webp">
+    <img src="assets/bizinfo-light.webp" width="344" height="343" loading="lazy" decoding="async"
+      alt="사업자 정보 · 상호 주식회사 브이로프 · 대표이사 · 사업자등록번호 433-88-02526 · 통신판매업 신고번호 제2024-서울은평-0124호 · 주소 서울특별시 은평구 은평로13길 11-6, 303호 · 전화 070-8246-9001 · 이메일 contact (at) vrof.co.kr">
+  </picture>
+</footer>
 <script type="module" src="app.js"></script>
 <script type="module" src="pass.js"></script>
 </body>
