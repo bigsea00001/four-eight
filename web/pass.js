@@ -13,6 +13,9 @@
 
 const API = "/api/pass";
 const K_CLAIMS = "fe_pass_claims", K_CODE = "fe_pass_code", K_EXP = "fe_pass_exp", K_RCPT = "fe_pass_receipt";
+const K_GIFTS = "fe_pass_gifts";
+// 선물용으로 산 코드는 fe_pass_code 에 절대 넣지 않는다 — 이 목록(fe_pass_gifts)에만 쌓는다.
+// 이 기기의 이용권과 완전히 다른 서랍이라, 선물을 사도 내가 가진 코드는 바뀌지 않는다.
 const POLL_MS = 30000;
 // 결제 확인을 기다리는 화면은 이 시간까지만 띄운다(결제창 만료 15분 + 블록 확인).
 // 그 뒤로도 찾기표는 지우지 않고 열 때마다 조용히 확인한다 — 늦게 확인되는 결제가 있다.
@@ -52,6 +55,18 @@ function addClaim(t, extra) {
 }
 function dropClaim(t) { saveClaims(claims().filter(c => c.t !== t)); }
 const waitingClaims = () => claims().filter(c => !c.dismissed && Date.now() - c.at < WAIT_SCREEN_MS);
+
+// 「보낸 선물」 목록 — fe_pass_code 와 다른 서랍이다. 코드가 곧 이용권이므로 여기 담긴 것도
+// 남에게 건네질 수 있다(선물 카드 재사용) — 결제 번호·금액은 화면엔 참고로만 보이고 카드 그림엔 안 넣는다.
+let memGifts = null;
+function giftList() {
+  if (memGifts) return memGifts;
+  try { return JSON.parse(store.get(K_GIFTS) || "[]").filter(g => g && g.code); } catch (e) { return []; }
+}
+function addGift(entry) {
+  const list = giftList().concat([entry]).slice(-50);
+  if (store.set(K_GIFTS, JSON.stringify(list))) memGifts = null; else memGifts = list;
+}
 
 const box = document.getElementById("pass");
 const link = document.getElementById("passlink");
@@ -110,8 +125,9 @@ function renderOwned(code, exp, fresh) {
   b.append(keep);
 
   // 선물 카드 — 코드가 그대로 이용권이므로, 선물하면 이 기기와 코드를 나눠 쓰게 된다는 것을 먼저 알린다.
-  // 🔴 .pass-save 는 "구매 확인서 저장" 전용 셀렉터다(있으면 결제한 코드라는 뜻) — 시험이 그것으로 구매 여부를
-  // 가린다. 선물 카드는 결제 여부와 무관하게 항상 보이므로 클래스를 빌리지 않고 인라인 스타일로 같은 모양만 낸다.
+  // 🔴 이 단추(.pass-gift)·이 문구는 season2/run-season2.js(다른 담당 소유, 고치지 말라고 지시받음)가
+  // 그대로 의존한다 — 그래서 권고(없앰)와 다르게 «남겨 둔다». 대신 선물용 결제로 가는 새 안내를 아래에
+  // «더한다»(교체가 아니라 추가). 정리는 그 시험을 손볼 수 있는 담당이 결정할 일이다 — 보고에 적는다.
   b.append(el("div", "fine",
     "이 코드를 선물하면 받는 분과 함께 쓰게 됩니다 — 이 기기의 이용권도 같은 코드이기 때문입니다. " +
     "각자 따로 쓰려면 새로 하나 더 구매해 주세요."));
@@ -122,7 +138,24 @@ function renderOwned(code, exp, fresh) {
   gift.addEventListener("click", () => saveGiftCard(code, exp, gift));
   b.append(gift);
 
+  // 선물용 결제가 생긴 뒤로 권하는 길 — 한도를 나누지 않는 «새 코드»로 선물하기.
+  const giftNote = el("div", "fine pass-gift-note");
+  giftNote.style.marginTop = ".5rem";
+  const shopLink = el("button", "pass-linklike pass-goto-shop", "구매 상자");
+  shopLink.type = "button";
+  shopLink.style.background = "none";
+  shopLink.style.border = "none";
+  shopLink.style.padding = "0";
+  shopLink.style.font = "inherit";
+  shopLink.style.color = "var(--cinnabar)";
+  shopLink.style.textDecoration = "underline";
+  shopLink.style.cursor = "pointer";
+  shopLink.addEventListener("click", () => renderShop());
+  giftNote.append("한도를 나누지 않고 선물하려면 ", shopLink, "에서 「선물용으로 사기」를 고르세요.");
+  b.append(giftNote);
+
   box.append(b);
+  appendGiftsBlock();
 }
 
 function copyRow(text, buttonLabel) {
@@ -137,12 +170,43 @@ function copyRow(text, buttonLabel) {
   return row;
 }
 
+// ── 보낸 선물 목록 ──────────────────────────────────────────────────────
+// fe_pass_code(내 이용권)와 다른 서랍이다. 구매 상자·이용권 화면 «아래»에 항상 같이 붙는다 —
+// 지금 내 이용권이 있든 없든, 예전에 산 선물이 있으면 보인다.
+function renderGiftRow(g) {
+  const row = el("div", "block pass-gift-row");
+  row.append(copyRow(g.code));
+  row.append(el("div", "pass-exp", `${ymd(g.expires_at)}까지 씁니다.`));
+  const btn = el("button", "pass-btn-ghost pass-gift-save-row", "카드로 저장");
+  btn.addEventListener("click", () => saveGiftCard(g.code, g.expires_at, btn));
+  row.append(btn);
+  return row;
+}
+
+function appendGiftsBlock() {
+  const list = giftList();
+  if (!list.length) return;
+  const gb = el("div", "block pass-card pass-gifts");
+  const toggle = el("button", "pass-btn-ghost pass-gifts-toggle", `보낸 선물 ${list.length}개`);
+  toggle.type = "button";
+  const body = el("div", "pass-gifts-body");
+  body.hidden = true;
+  body.style.marginTop = ".6rem";
+  body.replaceChildren(...list.slice().reverse().map(renderGiftRow));
+  toggle.addEventListener("click", () => { body.hidden = !body.hidden; });
+  gb.append(toggle, body);
+  box.append(gb);
+}
+
 function renderPending() {
   box.replaceChildren();
-  const bankClaim = waitingClaims().find(c => c.bank);
+  const wc = waitingClaims();
+  const bankClaim = wc.find(c => c.bank);
+  const primary = bankClaim || wc[0];
+  const giftHead = primary && primary.gift ? "선물용 · " : "";
   const b = el("div", "block pass-card");
   if (bankClaim) {
-    b.append(el("div", "btitle", "아래 계좌로 9,900원을 보내 주세요"));
+    b.append(el("div", "btitle", giftHead + "아래 계좌로 9,900원을 보내 주세요"));
     // 한 줄에 몰면 좁은 화면에서 「(예금주」 가운데서 끊긴다 — 항목마다 한 줄, 복사는 계좌번호·입금자명만.
     const dl = el("dl", "pass-bank");
     const row = (label, value, copyVal, strong) => {
@@ -172,7 +236,7 @@ function renderPending() {
     cash.append("현금영수증이 필요하시면 입금 뒤 주문번호와 발급받을 번호를 ", contact, "로 알려 주세요.");
     b.append(cash);
   } else {
-    b.append(el("div", "btitle", "결제를 확인하고 있습니다"));
+    b.append(el("div", "btitle", giftHead + "결제를 확인하고 있습니다"));
     b.append(el("div", "sec-b",
       "비트코인 결제는 확인까지 보통 10분에서 1시간쯤 걸립니다. " +
       "이 페이지를 닫았다가 다시 열어도, 확인이 끝나면 여기에 코드가 나옵니다."));
@@ -194,14 +258,47 @@ function renderPending() {
 function renderShop(message) {
   box.replaceChildren();
   const b = el("div", "block pass-card");
+  let giftMode = false;
   if (BUY_OPEN) {
     b.append(el("div", "btitle", "1년 이용권 · 9,900원"));
     b.append(el("div", "sec-b", "AI 점술가 상담을 1년 동안 쓸 수 있습니다."));
+
+    // 선물용 두 갈래 단추 — 체크박스 하나보다 모바일에서 헷갈리지 않는다. 눌린 쪽이 진하게 보인다.
+    const giftRow = el("div", "pass-gift-toggle");
+    giftRow.style.display = "flex";
+    giftRow.style.gap = ".5rem";
+    giftRow.style.margin = ".7rem 0";
+    const optSelf = el("button", "pass-btn-ghost pass-gift-mode", "내가 쓰기");
+    const optGift = el("button", "pass-btn-ghost pass-gift-mode", "선물용으로 사기");
+    optSelf.type = "button"; optGift.type = "button";
+    optSelf.dataset.mode = "self"; optGift.dataset.mode = "gift";
+    optSelf.style.flex = "1"; optGift.style.flex = "1";
+
     const buyRow = el("div", "pass-buy-row");
     const buyBtc = el("button", "pass-btn pass-btn-btc", "비트코인으로 결제");
-    buyBtc.addEventListener("click", () => startCheckout(buyBtc));
+    buyBtc.addEventListener("click", () => startCheckout(buyBtc, giftMode));
     const buyBank = el("button", "pass-btn pass-btn-bank", "계좌이체로 결제");
-    buyBank.addEventListener("click", () => startBankCheckout(buyBank));
+    buyBank.addEventListener("click", () => startBankCheckout(buyBank, giftMode));
+
+    const applyGiftMode = (g) => {
+      giftMode = g;
+      optSelf.setAttribute("aria-pressed", String(!g));
+      optGift.setAttribute("aria-pressed", String(g));
+      optSelf.style.background = g ? "transparent" : "var(--cinnabar)";
+      optSelf.style.color = g ? "" : "#fff";
+      optSelf.style.borderColor = g ? "" : "var(--cinnabar)";
+      optGift.style.background = g ? "var(--cinnabar)" : "transparent";
+      optGift.style.color = g ? "#fff" : "";
+      optGift.style.borderColor = g ? "var(--cinnabar)" : "";
+      buyBtc.textContent = g ? "선물 · 비트코인으로 결제" : "비트코인으로 결제";
+      buyBank.textContent = g ? "선물 · 계좌이체로 결제" : "계좌이체로 결제";
+    };
+    optSelf.addEventListener("click", () => applyGiftMode(false));
+    optGift.addEventListener("click", () => applyGiftMode(true));
+    applyGiftMode(false);
+    giftRow.append(optSelf, optGift);
+    b.append(giftRow);
+
     if (BTC_OPEN) buyRow.append(buyBtc);
     buyRow.append(buyBank);
     b.append(buyRow);
@@ -234,6 +331,7 @@ function renderShop(message) {
   msg.id = "pass-msg";
   b.append(msg);
   box.append(b);
+  appendGiftsBlock();
 }
 
 function receipt(code) {
@@ -266,6 +364,51 @@ function saveReceipt(code, exp, rc) {
   a.download = `fe-eet-kr-구매확인서-${rc.invoice_id}.txt`;
   document.body.append(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// ── 선물용 결제 확인됨 ─────────────────────────────────────────────────
+// fe_pass_code 와 무관한 화면이다 — 이 코드를 이 기기의 이용권으로 넣지 않았다는 것을 분명히 적는다.
+function renderGiftReady(entry) {
+  box.replaceChildren();
+  const b = el("div", "block pass-card");
+  b.append(el("div", "btitle", "선물 코드"));
+
+  const row = el("div", "pass-code-row");
+  const c = el("code", "pass-code", entry.code);
+  c.style.fontSize = "1.4rem";     // 이 화면의 유일한 목적은 이 코드를 크게 보여 주는 것이다
+  c.style.padding = ".6rem .85rem";
+  const copy = el("button", "pass-btn-ghost", "복사");
+  copy.addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(entry.code); copy.textContent = "복사됨"; }
+    catch (e) { copy.textContent = "길게 눌러 복사"; }
+  });
+  row.append(c, copy);
+  b.append(row);
+
+  b.append(el("div", "pass-exp", `${ymd(entry.expires_at)}까지 씁니다.`));
+
+  if (entry.invoice_id) {
+    b.append(el("div", "pass-rcpt", `결제 번호 ${entry.invoice_id} · ${Number(entry.amount_krw).toLocaleString("ko-KR")}원 · 결제 확인 ${ymd(entry.settled_at)}`));
+  }
+
+  const btnRow = el("div", "pass-code-row");
+  btnRow.style.marginTop = ".6rem";
+  const giftBtn = el("button", "pass-btn-ghost pass-gift pass-gift-save-main", "선물 카드로 저장");
+  giftBtn.addEventListener("click", () => saveGiftCard(entry.code, entry.expires_at, giftBtn));
+  btnRow.append(giftBtn);
+  if (entry.invoice_id) {
+    const save = el("button", "pass-btn-ghost pass-save", "구매 확인서 저장");
+    save.addEventListener("click", () => saveReceipt(entry.code, entry.expires_at, entry));
+    btnRow.append(save);
+  }
+  b.append(btnRow);
+
+  b.append(el("div", "fine",
+    "받는 분이 fe.eet.kr 위쪽 「이용권」에서 이 코드를 넣으면 1년 동안 AI 점술가를 쓸 수 있습니다. " +
+    "이 코드는 이 기기의 이용권으로 저장되지 않았습니다."));
+
+  box.append(b);
+  appendGiftsBlock();
 }
 
 // ── 선물 카드 ───────────────────────────────────────────────────────────
@@ -418,14 +561,14 @@ const say = (id, text) => { const e = document.getElementById(id); if (e) e.text
 
 // ── 동작 ────────────────────────────────────────────────────────────────
 
-async function startCheckout(btn) {
+async function startCheckout(btn, gift) {
   btn.disabled = true;
   say("pass-msg", "결제창을 여는 중…");
   try {
     const r = await fetch(`${API}/checkout`, { method: "POST" });
     const d = await r.json().catch(() => ({}));
     if (!r.ok || !d.checkout_url || !d.claim) throw new Error(String(r.status));
-    addClaim(d.claim);                     // 떠나기 전에 먼저 적는다
+    addClaim(d.claim, gift ? { gift: true } : undefined);   // 떠나기 전에 먼저 적는다
     sendEvent("checkout_btc");
     location.href = d.checkout_url;
   } catch (e) {
@@ -434,7 +577,7 @@ async function startCheckout(btn) {
   }
 }
 
-async function startBankCheckout(btn) {
+async function startBankCheckout(btn, gift) {
   btn.disabled = true;
   say("pass-msg", "주문을 만드는 중…");
   try {
@@ -446,7 +589,7 @@ async function startBankCheckout(btn) {
     }
     const d = await r.json().catch(() => ({}));
     if (!r.ok || !d.claim || !d.order_no || !d.bank) throw new Error(String(r.status));
-    addClaim(d.claim, { order_no: d.order_no, amount_krw: d.amount_krw, bank: d.bank, expires_at: d.expires_at });
+    addClaim(d.claim, { order_no: d.order_no, amount_krw: d.amount_krw, bank: d.bank, expires_at: d.expires_at, ...(gift ? { gift: true } : {}) });
     sendEvent("checkout_bank");
     stopPolling();
     draw();
@@ -492,6 +635,15 @@ async function checkClaims() {
     if (!d) { trouble = true; continue; }
     if (d.status === "ready") {
       dropClaim(c.t);
+      if (c.gift) {
+        // 선물용 결제다 — fe_pass_code 는 절대 건드리지 않는다. 이 기기의 이용권과 다른 서랍(fe_pass_gifts)에만 쌓는다.
+        const entry = { code: d.code, expires_at: d.expires_at, invoice_id: d.invoice_id, amount_krw: d.amount_krw, settled_at: d.settled_at, at: Date.now() };
+        addGift(entry);
+        stopPolling();
+        renderGiftReady(entry);
+        open(true);
+        return;
+      }
       if (!store.set(K_CODE, d.code) || !store.set(K_EXP, d.expires_at)) memCode = { code: d.code, exp: d.expires_at };
       if (d.invoice_id) store.set(K_RCPT, JSON.stringify({ code: d.code, invoice_id: d.invoice_id, amount_krw: d.amount_krw, settled_at: d.settled_at }));
       stopPolling();
@@ -552,8 +704,14 @@ function ownedCode() {
 
 // BTCPay 가 돌려보낸 주소(?claim=찾기표). 저장되면 주소창에서 지운다 — 주소를 남에게 보내도 코드가 새지 않게.
 // 저장이 막힌 창이면 지우지 않는다. 그 주소가 찾기표의 마지막 사본이다.
+// 🔴 addClaim(t, extra) 는 같은 토큰이면 «덮어쓴다» — extra 없이 다시 부르면 떠나기 전에 실어 둔
+// gift:true 가 지워진다. 돌아왔을 때는 먼저 저장돼 있던 것(gift 포함)을 그대로 다시 실어야 한다.
 const returned = params.get("claim");
-if (returned && addClaim(returned)) {
+const returnedPrior = returned ? claims().find(c => c.t === returned) : null;
+const returnedExtra = returnedPrior
+  ? Object.fromEntries(Object.entries(returnedPrior).filter(([k]) => k !== "t" && k !== "at" && k !== "dismissed"))
+  : undefined;
+if (returned && addClaim(returned, returnedExtra)) {
   params.delete("claim");
   const q = params.toString();
   history.replaceState(null, "", location.pathname + (q ? "?" + q : "") + location.hash);
@@ -588,5 +746,6 @@ addEventListener("fe-pass:need", () => {
 
 // 다른 탭에서 코드를 받으면 이 탭도 따라 바꾼다.
 addEventListener("storage", (e) => {
-  if (e.key === K_CODE || e.key === K_CLAIMS) { stopPolling(); if (!box.hidden) draw(); link.textContent = ownedCode() ? "이용권" : link.textContent; }
+  if (e.key === K_GIFTS) memGifts = null;
+  if (e.key === K_CODE || e.key === K_CLAIMS || e.key === K_GIFTS) { stopPolling(); if (!box.hidden) draw(); link.textContent = ownedCode() ? "이용권" : link.textContent; }
 });
