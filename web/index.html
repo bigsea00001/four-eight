@@ -335,6 +335,8 @@
   .y27-consult-link { color:var(--cinnabar); font-weight:600; text-decoration:none; }
   .y27-consult-link:hover { text-decoration:underline; }
 </style>
+<!-- PostHog 방문 분석 — 설정·가린 자리는 posthog.js 머리 주석에 있다. -->
+<script src="posthog.js" defer></script>
 </head>
 <body>
 <div class="hero">
@@ -355,22 +357,22 @@
 </div>
 <main>
   <a href="#start" id="season-strip" class="season-strip" hidden><span class="hanja">丁未</span>2027 정미년, 붉은 양의 해 — 내 명식으로 보는 새해 흐름</a>
-  <div id="pass" hidden></div>
+  <div id="pass" class="ph-no-capture" hidden></div>
 
   <div class="form" id="start">
-    <fieldset class="fgroup">
+    <fieldset class="fgroup ph-no-capture">
       <legend>생년월일</legend>
       <div class="fld"><label>연</label><input id="y" type="number" value="2000"></div>
       <div class="fld"><label>월</label><input id="mo" type="number" value="1"></div>
       <div class="fld"><label>일</label><input id="d" type="number" value="1"></div>
     </fieldset>
-    <fieldset class="fgroup">
+    <fieldset class="fgroup ph-no-capture">
       <legend>태어난 시각</legend>
       <div class="fld"><label>시</label><input id="h" type="number" value="1"></div>
       <div class="fld"><label>분</label><input id="mi" type="number" value="1"></div>
       <div class="fhelp">모르면 비워 두세요</div>
     </fieldset>
-    <fieldset class="fgroup">
+    <fieldset class="fgroup ph-no-capture">
       <legend>성별·달력</legend>
       <div class="fld"><label>성별</label><select id="g"><option>남</option><option>여</option></select></div>
       <div class="fld"><label>달력</label><select id="cal"><option>양력</option><option>음력</option></select></div>
@@ -382,7 +384,7 @@
   <div id="loading" aria-live="polite"><div class="spinner"></div><div class="txt"><b>사주 계산기를 준비하고 있습니다.</b><br><span id="loadmsg">약 18MB를 한 번만 받습니다. 다음부터는 즉시 열립니다.</span></div></div>
   <div id="status" aria-live="polite"></div>
   <div id="error" hidden aria-live="assertive"></div>
-  <div id="result" hidden aria-live="polite"></div>
+  <div id="result" class="ph-no-capture" hidden aria-live="polite"></div>
 </main>
 <footer class="site-foot">
   <div class="site-foot-in">
