@@ -16,6 +16,18 @@ const PATCH = params.get("patch") !== "0";
 // ?debug=1 이면 #status 에 전송·컴파일 시간 같은 개발 기록을 보입니다. 평소엔 「계산 완료」만.
 const DEBUG = params.get("debug") === "1";
 
+// 시즌(2027 정미년 연말연시 대목) — 한국 시각 2026-11-15 00:00 ~ 2027-02-20 23:59 에만 켠다.
+// ?season=1 이면 날짜와 무관하게 켠다(미리보기·시험용). 켜고 끄는 판단은 이 함수 하나뿐이다.
+// 한국은 서머타임이 없어 항상 UTC+9이므로, 방문자 로컬 시계가 어느 시간대든 흔들리지 않도록
+// KST 벽시계를 고정 UTC 오프셋으로 미리 계산해 둔다(방문자 기기의 타임존 설정에 기대지 않는다).
+function isSeason() {
+  if (params.get("season") === "1") return true;
+  const now = Date.now();
+  const start = Date.UTC(2026, 10, 14, 15, 0, 0); // 2026-11-15 00:00 KST
+  const end = Date.UTC(2027, 1, 20, 15, 0, 0);    // 2027-02-21 00:00 KST(=2027-02-20 23:59:59 KST 까지 포함)
+  return now >= start && now < end;
+}
+
 // 오행 색은 앱 팔레트(CSS 변수)를 그대로 씁니다 — 명리에서 의미가 있는 색입니다.
 const ELEMENT_VAR = { "목":"--wood", "화":"--fire", "토":"--earth", "금":"--metal", "수":"--water" };
 const color = (el) => `var(${ELEMENT_VAR[el] || "--ink"})`;
@@ -476,8 +488,238 @@ function setupConsult(c, root) {
   q.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) go(); });
 }
 
+// ── 2027 정미년(시즌) ────────────────────────────────────────────────────
+// 근거는 전부 십신이고, 좋다/나쁘다·점수·길흉 표현은 쓰지 않는다(CLAUDE.md §2).
+// 마지막 글자에 받침이 있는지로 「으로/로」를 고른다 — 십신 이름 10개 전부에 맞는다.
+function hasBatchim(word) {
+  const ch = word.charCodeAt(word.length - 1);
+  if (ch < 0xAC00 || ch > 0xD7A3) return false;
+  return (ch - 0xAC00) % 28 !== 0;
+}
+const eulLo = (word) => (hasBatchim(word) ? "으로" : "로");
 
-function render(c) {
+// "이달과 올해" 섹션의 baselineText는 (월운 규칙 text) + "\n\n" + (세운 규칙 text) 순서로
+// 이어붙여져 있습니다(SajuKit RuleEngine.baselineText·TimeFacts.timeSections 참고 — 태그 순서가
+// wolwoon_sibsin 다음 sewoon_sibsin이라 항상 이 순서로 매칭됩니다). rules.json의 월운 규칙 10개는
+// 전부 "…월운은"으로, 세운 규칙 10개는 전부 "…세운은"으로 문장이 시작하고 서로의 낱말("월운"/"세운")이
+// 상대 문단에 섞이는 사례가 없음을 확인했습니다 — 그래서 "\n\n"으로 문단을 나눈 뒤 "세운"이 들어간
+// 문단만 남기면 월운 문단이 안전하게 빠집니다. 혹시 못 가르면(문단이 하나뿐이거나 "세운"이 없으면)
+// 통째로 쓰지 않고 빈 채로 둡니다 — 위 십신 문장만으로 근거는 이미 있습니다.
+function sewoonOnlyParagraphs(c2027) {
+  const sec = ((c2027.time && c2027.time.sections) || []).find(s => s.title === "이달과 올해");
+  if (!sec) return [];
+  return sec.text.split("\n\n").filter(p => p.includes("세운"));
+}
+
+function renderYear2027(c, c2027) {
+  const y = c2027.time.year;
+  const dm = `${c.dayMasterKorean}${c.dayMasterHanja}`;
+  let html = `<div class="today-head block">
+    <div class="today-gj">${ganjiBlock(y.cell, "lg")}</div>
+    <div class="today-info">
+      <div class="today-title hanja">2027 정미년 · ${y.cell.ganjiKorean}(${y.cell.ganjiHanja})</div>
+      <div class="chips"><span class="chip strong">천간 ${y.stemGod}</span><span class="chip">지지 ${y.branchGod}</span></div>
+      <div class="sub-note">붉은 양의 해 · 일간 ${dm} 기준 · 세운</div>
+    </div>
+  </div>`;
+
+  html += `<div class="block"><div class="sec-b">2027 정미년의 천간 丁(화)은 당신의 일간 ${dm}에게 ${esc(y.stemGod)}, `
+    + `지지 未(토)는 ${esc(y.branchGod)}${eulLo(y.branchGod)} 들어옵니다.</div></div>`;
+
+  const paras = sewoonOnlyParagraphs(c2027);
+  if (paras.length) {
+    html += `<div class="block"><div class="btitle">올해의 흐름</div>`
+      + `<div class="sec-b">${paras.join("\n\n").replace(/\n/g, "<br>")}</div></div>`;
+  }
+
+  html += `<div class="block"><div class="fine" style="margin-top:0">사주에서 새해는 2월 4일 입춘부터입니다. `
+    + `1월 1일과 설날(2월 7일)은 아직 병오년의 끝자락입니다.</div></div>`;
+
+  html += `<div class="block"><div class="sec-b">더 깊은 풀이는 <a href="#" class="y27-consult-link">AI 점술가</a>에게 — `
+    + `주제 「지금 이 시기」를 고르고 2027년을 물어보세요.</div>
+    <div class="y27-actions">
+      <button class="y27-btn y27-share" type="button">이미지로 저장</button>
+      <button class="y27-btn y27-ics" type="button">입춘에 다시 보기(캘린더에 추가)</button>
+    </div>
+    <div class="fine y27-share-msg" aria-live="polite"></div>
+  </div>`;
+
+  return html;
+}
+
+// QR — 외부 서비스를 부르지 않고 브라우저 안에서 그린다(vendor/qrcode.js, MIT).
+// 표준 quiet zone(모듈 4칸)을 둬야 다른 리더가 잘 읽는다.
+function drawQrOnCanvas(ctx, text, x, y, size) {
+  const qr = window.qrcode(0, "M");
+  qr.addData(text);
+  qr.make();
+  const count = qr.getModuleCount();
+  const margin = 4;
+  const cell = size / (count + margin * 2);
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(x, y, size, size);
+  ctx.fillStyle = "#000";
+  for (let row = 0; row < count; row++) {
+    for (let col = 0; col < count; col++) {
+      if (qr.isDark(row, col)) {
+        ctx.fillRect(x + (col + margin) * cell, y + (row + margin) * cell, Math.ceil(cell) + 0.5, Math.ceil(cell) + 0.5);
+      }
+    }
+  }
+}
+
+function loadImageSafeY27(src) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null); // 이미지가 없어도 카드는 만들어진다
+    img.src = src;
+  });
+}
+
+const Y27_W = 1080, Y27_H = 1350;
+
+// 공유 카드 — 생년월일시·이름은 절대 넣지 않는다. 丁未 두 글자는 앱 오행 팔레트의 «라이트» 값을
+// 그대로 쓴다(pass.js의 선물 카드와 같은 방식 — 카드 자체는 누구 화면에서 열리든 같은 색으로 보여야
+// 하므로 뷰어의 다크모드를 따라가지 않는다). 화면 결과가 아니라 «다운로드되는 파일»이라는 점이 다르다.
+async function buildYear2027Canvas(c, c2027) {
+  const y = c2027.time.year;
+  const canvas = document.createElement("canvas");
+  canvas.width = Y27_W; canvas.height = Y27_H;
+  const ctx = canvas.getContext("2d");
+  const cx = Y27_W / 2;
+  const PAPER = "#FAF7F0", INK = "#2A251F", INK_SOFT = "#6B6154", CINNABAR = "#B43A2E";
+  const FIRE = "#EE7038", EARTH = "#7F5502"; // --fire, --earth 라이트 값(CLAUDE.md §13)
+
+  ctx.fillStyle = PAPER; ctx.fillRect(0, 0, Y27_W, Y27_H);
+
+  const BANNER_H = 560;
+  const hero = await loadImageSafeY27("assets/hero-tall.webp");
+  if (hero) {
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0, 0, Y27_W, BANNER_H); ctx.clip();
+    const h = Y27_W * (hero.height / hero.width);
+    ctx.drawImage(hero, 0, 0, Y27_W, h);
+    ctx.restore();
+    const fade = ctx.createLinearGradient(0, BANNER_H - 160, 0, BANNER_H);
+    fade.addColorStop(0, "rgba(250,247,240,0)");
+    fade.addColorStop(1, PAPER);
+    ctx.fillStyle = fade;
+    ctx.fillRect(0, BANNER_H - 160, Y27_W, 160);
+  }
+
+  try {
+    await document.fonts.load('700 46px "Noto Serif KR"');
+    await document.fonts.load('700 220px "Noto Serif KR"');
+    await document.fonts.load('500 34px "Pretendard"');
+  } catch (e) { /* 대체 글꼴로 진행 */ }
+
+  ctx.textAlign = "center";
+
+  ctx.fillStyle = CINNABAR;
+  ctx.font = '700 46px "Noto Serif KR", "AppleMyungjo", "Nanum Myeongjo", serif';
+  ctx.fillText("나의 2027 정미년", cx, 660);
+
+  ctx.font = '700 220px "Noto Serif KR", "AppleMyungjo", "Nanum Myeongjo", serif';
+  ctx.fillStyle = FIRE; ctx.fillText("丁", cx - 130, 900);
+  ctx.fillStyle = EARTH; ctx.fillText("未", cx + 130, 900);
+
+  ctx.fillStyle = INK;
+  ctx.font = '500 36px -apple-system, "Pretendard", "Apple SD Gothic Neo", sans-serif';
+  ctx.fillText(`천간 ${y.stemGod} · 지지 ${y.branchGod}`, cx, 990);
+
+  // 남은 세로 공간(캔버스 높이 1350)에 다 들어가도록 QR 크기·자리를 먼저 계산해 둔다 —
+  // 예전 판은 QR 아래 두 줄이 캔버스 밖으로 나가 "fe.eet.kr" 글자가 통째로 안 보였다.
+  const qrSize = 250, qrY = 1020;
+  drawQrOnCanvas(ctx, "https://fe.eet.kr/", cx - qrSize / 2, qrY, qrSize);
+
+  ctx.font = '600 30px -apple-system, "Pretendard", sans-serif';
+  ctx.fillStyle = CINNABAR;
+  ctx.fillText("fe.eet.kr", cx, qrY + qrSize + 55);
+
+  return canvas;
+}
+
+async function saveYear2027Card(c, c2027, btn, msgEl) {
+  const original = btn.textContent;
+  btn.disabled = true; btn.textContent = "카드 만드는 중…"; msgEl.textContent = "";
+  try {
+    const canvas = await buildYear2027Canvas(c, c2027);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+    if (!blob) throw new Error("no-blob");
+    const file = new File([blob], "fe-eet-kr-2027-정미년.png", { type: "image/png" });
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: "나의 2027 정미년" });
+        btn.textContent = original; btn.disabled = false;
+        return;
+      } catch (e) {
+        if (e && e.name === "AbortError") { btn.textContent = original; btn.disabled = false; return; }
+        // 공유가 지원된다고 했는데 실패했으면 저장으로 대신한다
+      }
+    }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = file.name;
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  } catch (e) {
+    msgEl.textContent = "카드를 만들지 못했습니다. 잠시 뒤 다시 시도해 주세요.";
+    btn.textContent = original; btn.disabled = false;
+    return;
+  }
+  btn.textContent = original; btn.disabled = false;
+}
+
+// 입춘(2027-02-04) 알림 — 캘린더 .ics 파일. 연락처는 받지 않는다(달력 앱이 로컬에서 처리한다).
+function icsUtcStamp(d) {
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}T${p(d.getUTCHours())}${p(d.getUTCMinutes())}${p(d.getUTCSeconds())}Z`;
+}
+function buildIcs() {
+  const esc = (s) => String(s).replace(/([,;])/g, "\\$1");
+  const lines = [
+    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//fe.eet.kr//2027 season//KO", "CALSCALE:GREGORIAN",
+    "BEGIN:VEVENT",
+    "UID:fe-eet-kr-ipchun-2027@fe.eet.kr",
+    "DTSTAMP:" + icsUtcStamp(new Date()),
+    "DTSTART;VALUE=DATE:20270204",
+    "DTEND;VALUE=DATE:20270205",
+    "SUMMARY:" + esc("입춘 — 2027 정미년 시작"),
+    "DESCRIPTION:" + esc("사주에서 2027년(정미년)이 시작되는 날입니다. https://fe.eet.kr/"),
+    // 알림 하루 전 오전 9시 — 종일 일정의 시작(자정)에서 15시간 전이 그 전날 09:00이다.
+    "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:입춘 알림", "TRIGGER:-PT15H", "END:VALARM",
+    "END:VEVENT", "END:VCALENDAR",
+  ];
+  return lines.join("\r\n") + "\r\n";
+}
+
+function downloadIcs() {
+  const blob = new Blob([buildIcs()], { type: "text/calendar;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "입춘-2027-정미년.ics";
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+function setupYear2027(c, c2027, root, activateTab) {
+  const panel = root.querySelector('[data-p="y2027"]'); if (!panel) return;
+  const link = panel.querySelector(".y27-consult-link");
+  if (link) link.addEventListener("click", (e) => {
+    e.preventDefault();
+    activateTab("consult");
+    const timing = root.querySelector('.ctopic[data-k="timing"]');
+    if (timing) timing.click();
+  });
+  const shareBtn = panel.querySelector(".y27-share");
+  const msgEl = panel.querySelector(".y27-share-msg");
+  if (shareBtn) shareBtn.addEventListener("click", () => saveYear2027Card(c, c2027, shareBtn, msgEl));
+  const icsBtn = panel.querySelector(".y27-ics");
+  if (icsBtn) icsBtn.addEventListener("click", downloadIcs);
+}
+
+function render(c, c2027) {
   const dm = `${c.dayMasterKorean}${c.dayMasterHanja}`;
   const t = c.time;
   const tabs = [];
@@ -491,6 +733,8 @@ function render(c) {
     add("month", "이달", renderPeriod(t, "month", dm));
     add("year", "올해", renderPeriod(t, "year", dm));
   }
+  // 「2027」 탭 — 「올해」 바로 옆(시즌에만, 계산이 됐을 때만).
+  if (c2027 && c2027.time && c2027.time.year) add("y2027", "2027", renderYear2027(c, c2027));
   add("chart", "명식", renderChart(c));
   if (t) add("daeun", "대운", renderDaeun(t));
   add("consult", "AI 점술가", renderConsult(c));
@@ -509,6 +753,7 @@ function render(c) {
   // 기본 탭 — 시간운이 있으면 오늘, 없으면 명식.
   activate(t ? "today" : "chart");
   setupConsult(c, el);
+  if (c2027 && c2027.time && c2027.time.year) setupYear2027(c, c2027, el, activate);
 }
 
 function showError(e) {
@@ -524,11 +769,13 @@ function todayArg() {
   return `today=${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
 }
 
-function readForm() {
+// todayOverride를 주면 그 today= 인자로 바꿔 계산합니다(같은 출생 정보를 다른 기준일로
+// 다시 돌릴 때 — 예: 2027 정미년 세운 카드). 안 주면 지금까지와 같이 오늘 날짜입니다.
+function readForm(todayOverride) {
   const h = $("h").value.trim() === "" ? "-" : $("h").value.trim();
   const argv = [$("y").value, $("mo").value, $("d").value, h, $("mi").value || "0", $("g").value, "/rules/rules.json"];
   if ($("cal").value === "음력") argv.push("음력");
-  argv.push(todayArg());
+  argv.push(todayOverride || todayArg());
   return argv;
 }
 
@@ -539,8 +786,15 @@ async function calculate() {
     log("계산 중…");
     const t0 = performance.now();
     const chart = await runSaju(readForm());
+    // 시즌이면 같은 출생 정보를 기준일 2027-06-15 로 한 번 더 돌려 2027 정미년(세운) 정보만 뽑습니다.
+    // 본계산 결과(chart)는 건드리지 않고, 이 두 번째 결과는 「2027」 탭에만 씁니다.
+    let chart2027 = null;
+    if (isSeason()) {
+      try { chart2027 = await runSaju(readForm("today=2027-6-15")); }
+      catch (e) { chart2027 = null; /* 2027 카드만 못 만들 뿐, 본계산은 그대로 보여준다 */ }
+    }
     const t1 = performance.now();
-    render(chart);
+    render(chart, chart2027);
     sendEvent("calc");
     if (DEBUG) {
       const wire = (timings.wasmBytes/1024/1024).toFixed(1);
@@ -556,6 +810,22 @@ async function calculate() {
 }
 
 $("go").addEventListener("click", calculate);
+
+// 시즌 띠 — 보일지 말지는 isSeason() 하나로 정한다. 계산 전이면 href="#start" 기본 동작(스크롤)에
+// 맡기고, 계산 후(결과가 있으면)면 「2027」 탭을 눌러 준다.
+const seasonStrip = $("season-strip");
+if (seasonStrip) {
+  if (isSeason()) seasonStrip.hidden = false;
+  seasonStrip.addEventListener("click", (e) => {
+    const resultEl = $("result");
+    const tabBtn = resultEl && !resultEl.hidden && resultEl.querySelector('.tab[data-t="y2027"]');
+    if (tabBtn) {
+      e.preventDefault();
+      tabBtn.click();
+      resultEl.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  });
+}
 
 // 자동 실행(헤드리스 스크린샷용). ?auto=1&y=&mo=&d=&h=&mi=&g=&cal=&tab=
 if (params.get("auto") === "1") {

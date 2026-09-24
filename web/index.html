@@ -68,7 +68,12 @@
      어둠·받침을 따로 만들면(3차 때 해봤다) 학이 가려지고 뜬 상자처럼 보인다 — 그래서 없앴다.
      두 모드가 갈리는 자리는 히어로 «바깥», 즉 .hero-fade 가 녹아드는 바탕색(--paper)뿐이다.
      이미지가 없거나 못 받으면(onerror) img를 숨기고 --hero-1→--hero-2 그라디언트만 남는다. */
+  /* pointer-events:none — 히어로는 배경 그림일 뿐이다. margin-bottom 음수로 다음 형제(main)의
+     맨 위가 히어로 박스 안쪽(이미지·번짐·페이드 자리)과 겹치는데, 그 자리에 놓이는 상호작용
+     요소(시즌 띠 등)가 이 배경들에 클릭을 뺏기지 않도록 막아 둔다. 실제로 눌러야 하는
+     .hero-bar·.hero-content만 아래에서 도로 켠다. */
   .hero { position:relative; overflow:hidden; height:min(78vh, 680px); margin-bottom:-3.4rem;
+    pointer-events:none;
     background:linear-gradient(160deg, var(--hero-1), var(--hero-2)); }
   .hero-pic, .hero-img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block;
     object-position: 34% 44%; }
@@ -83,11 +88,11 @@
   .hero-fade { position:absolute; left:0; right:0; bottom:0; height:22%;
     background:linear-gradient(to bottom, transparent, var(--paper)); }
   /* 상단 바 — 히어로 위에 겹친다(투명·«고정» 먹빛 글자 + «고정» 주사 마크). 다크에서도 색이 안 바뀐다. */
-  .hero-bar { position:absolute; top:0; left:0; right:0; z-index:3; }
+  .hero-bar { position:absolute; top:0; left:0; right:0; z-index:3; pointer-events:auto; }
   .hero-bar .mark { color:#B43A2E; text-shadow:0 1px 3px rgba(255,255,255,.5); }
   .hero-bar .name, .hero-bar a { color:#2A251F; text-shadow:0 1px 3px rgba(255,255,255,.5); }
   .hero-content { position:absolute; left:0; right:0; top:15%; z-index:2; max-width:46rem; margin:0 auto; width:100%;
-    box-sizing:border-box; padding:0 1.25rem; }
+    box-sizing:border-box; padding:0 1.25rem; pointer-events:auto; }
   /* 글자 줄 뒤에만 좁고 옅게 — 데스크톱은 해가 드러나야 하므로 받침을 글줄 폭에 바짝 붙이고 흐리게 낮췄다.
      색은 항상 흰빛 고정(다크에서도 바뀌지 않는다) — 자리마다 대비를 픽셀로 재서 정한 불투명도다. */
   .hero-content::before { content:""; position:absolute; top:-.6rem; left:-.9rem; right:-1rem; z-index:-1;
@@ -309,6 +314,26 @@
     .foot-left { flex:1; padding-top:.2rem; }
     .foot-right { flex:none; }
   }
+  /* 시즌(2026-11-15~2027-02-20) — 히어로 바로 아래, 입력 카드 위의 얇은 한 줄.
+     기본은 hidden 속성으로 숨기고(다른 hidden 요소들과 같은 규약 — #pass·#passlink 참고),
+     JS가 isSeason()일 때만 hidden을 뗀다. `.season-strip{display:...}`을 hidden 여부와
+     무관하게 걸면 [hidden]의 UA 규칙(동급 특이성)을 이겨 버려 늘 보이게 되므로
+     반드시 :not([hidden])에만 건다. */
+  .season-strip:not([hidden]) { display:block; position:relative; text-align:center; text-decoration:none;
+    font-size:.78rem; color:var(--cinnabar); background:color-mix(in srgb, var(--cinnabar) 5%, var(--surface));
+    border-top:1px solid color-mix(in srgb, var(--cinnabar) 30%, var(--line));
+    border-bottom:1px solid color-mix(in srgb, var(--cinnabar) 30%, var(--line));
+    padding:.55rem 1rem; margin:0 0 1.1rem; }
+  .season-strip:not([hidden]):hover { background:color-mix(in srgb, var(--cinnabar) 9%, var(--surface)); }
+  .season-strip .hanja { font-weight:600; margin-right:.4rem; }
+  /* 「2027」 탭 — 공유 카드·입춘 알림 단추. 색·글꼴은 나머지 화면과 같은 토큰만 쓴다. */
+  .y27-actions { display:flex; gap:.6rem; flex-wrap:wrap; margin-top:.9rem; }
+  .y27-btn { background:transparent; border:1px solid var(--line); color:var(--ink); border-radius:9px;
+    padding:.5rem 1rem; font-size:.85rem; cursor:pointer; font-family:inherit; }
+  .y27-btn:hover { border-color:var(--cinnabar); color:var(--cinnabar); }
+  .y27-btn:disabled { opacity:.5; cursor:default; }
+  .y27-consult-link { color:var(--cinnabar); font-weight:600; text-decoration:none; }
+  .y27-consult-link:hover { text-decoration:underline; }
 </style>
 </head>
 <body>
@@ -329,6 +354,7 @@
   </div>
 </div>
 <main>
+  <a href="#start" id="season-strip" class="season-strip" hidden><span class="hanja">丁未</span>2027 정미년, 붉은 양의 해 — 내 명식으로 보는 새해 흐름</a>
   <div id="pass" hidden></div>
 
   <div class="form" id="start">
@@ -375,6 +401,8 @@
     </div>
   </div>
 </footer>
+<!-- 공유 카드의 QR을 브라우저 안에서 그리기 위한 작은 MIT 라이브러리(vendor/qrcode.js). 외부 서비스를 부르지 않는다. -->
+<script src="vendor/qrcode.js"></script>
 <script type="module" src="app.js"></script>
 <script type="module" src="pass.js"></script>
 </body>
