@@ -1,12 +1,14 @@
 // 1년 이용권 — 구매 · 결제 뒤 코드 받기 · 코드 입력.
 // 사주 계산(app.js)과 따로 둔다. 이 파일이 서버와 주고받는 것은 이용권 찾기표와 코드뿐이다.
 //
-//   POST /api/pass/checkout → { checkout_url, claim }   결제창 주소와 찾기표
-//   GET  /api/pass/claim?token= → pending | ready(code, expires_at) | unknown
+//   POST /api/pass/checkout   → { checkout_url, claim }   비트코인 결제창 주소와 찾기표
+//   POST /api/pass/bank-order → { order_no, claim, amount_krw, bank, expires_at }   무통장입금 계좌 안내
+//   GET  /api/pass/claim?token= → pending | ready(code, expires_at) | expired | unknown
 //   POST /api/pass/verify { code } → { valid, expires_at }
 //
-// 찾기표는 결제창으로 떠나기 «전»에 저장한다. BTCPay 가 돌려보내는 주소(?claim=)에만 기대면
-// 결제 뒤 창을 닫은 사람은 코드를 받을 길이 없다.
+// 찾기표는 결제창으로 떠나기 «전»에(비트코인) 또는 주문을 만들자마자(무통장입금) 저장한다.
+// BTCPay 가 돌려보내는 주소(?claim=)에만 기대면 결제 뒤 창을 닫은 사람은 코드를 받을 길이 없다.
+// 무통장입금은 계좌·주문번호를 찾기표 항목에 «같이» 저장한다 — 새로 열어도 그 안내가 다시 보이게.
 
 const API = "/api/pass";
 const K_CLAIMS = "fe_pass_claims", K_CODE = "fe_pass_code", K_EXP = "fe_pass_exp", K_RCPT = "fe_pass_receipt";
@@ -40,9 +42,9 @@ function saveClaims(list) {
   if (store.set(K_CLAIMS, JSON.stringify(kept))) memClaims = null; else memClaims = kept;
   return !memClaims;
 }
-function addClaim(t) {
+function addClaim(t, extra) {
   const list = claims().filter(c => c.t !== t);
-  list.push({ t, at: Date.now() });
+  list.push({ t, at: Date.now(), ...(extra || {}) });
   return saveClaims(list);
 }
 function dropClaim(t) { saveClaims(claims().filter(c => c.t !== t)); }
@@ -98,13 +100,40 @@ function renderOwned(code, exp, fresh) {
   box.append(b);
 }
 
+function copyRow(text, buttonLabel) {
+  const row = el("div", "pass-code-row");
+  row.append(el("code", "pass-code", text));
+  const btn = el("button", "pass-btn-ghost", buttonLabel || "복사");
+  btn.addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(text); btn.textContent = "복사됨"; }
+    catch (e) { btn.textContent = "길게 눌러 복사"; }
+  });
+  row.append(btn);
+  return row;
+}
+
 function renderPending() {
   box.replaceChildren();
+  const bankClaim = waitingClaims().find(c => c.bank);
   const b = el("div", "block pass-card");
-  b.append(el("div", "btitle", "결제를 확인하고 있습니다"));
-  b.append(el("div", "sec-b",
-    "비트코인 결제는 확인까지 보통 10분에서 1시간쯤 걸립니다. " +
-    "이 페이지를 닫았다가 다시 열어도, 확인이 끝나면 여기에 코드가 나옵니다."));
+  if (bankClaim) {
+    b.append(el("div", "btitle", "아래 계좌로 9,900원을 보내 주세요"));
+    b.append(copyRow(`${bankClaim.bank.name} ${bankClaim.bank.account} (예금주 ${bankClaim.bank.holder})`));
+    b.append(copyRow(`입금자명: ${bankClaim.order_no}`));
+    b.append(el("div", "sec-b",
+      "입금자명을 주문번호로 적어 주셔야 누가 보낸 돈인지 알 수 있습니다. " +
+      "입금을 확인하면 이 화면에 코드가 나옵니다 — 영업일 기준 하루 안에 확인합니다. " +
+      "3일 안에 입금이 없으면 주문이 취소됩니다."));
+    const cash = el("div", "fine");
+    const contact = el("a", "", "문의처"); contact.href = "terms.html"; contact.target = "_blank";
+    cash.append("현금영수증이 필요하시면 입금 뒤 주문번호와 발급받을 번호를 ", contact, "로 알려 주세요.");
+    b.append(cash);
+  } else {
+    b.append(el("div", "btitle", "결제를 확인하고 있습니다"));
+    b.append(el("div", "sec-b",
+      "비트코인 결제는 확인까지 보통 10분에서 1시간쯤 걸립니다. " +
+      "이 페이지를 닫았다가 다시 열어도, 확인이 끝나면 여기에 코드가 나옵니다."));
+  }
   const s = el("div", "fine pass-status", "");
   s.id = "pass-status";
   b.append(s);
@@ -124,10 +153,14 @@ function renderShop(message) {
   const b = el("div", "block pass-card");
   if (BUY_OPEN) {
     b.append(el("div", "btitle", "1년 이용권 · 9,900원"));
-    b.append(el("div", "sec-b", "AI 점술가 상담을 1년 동안 쓸 수 있습니다. 결제는 비트코인으로 합니다."));
-    const buy = el("button", "pass-btn", "비트코인으로 결제하기");
-    buy.addEventListener("click", () => startCheckout(buy));
-    b.append(buy);
+    b.append(el("div", "sec-b", "AI 점술가 상담을 1년 동안 쓸 수 있습니다."));
+    const buyRow = el("div", "pass-buy-row");
+    const buyBtc = el("button", "pass-btn pass-btn-btc", "비트코인으로 결제");
+    buyBtc.addEventListener("click", () => startCheckout(buyBtc));
+    const buyBank = el("button", "pass-btn pass-btn-bank", "계좌이체로 결제");
+    buyBank.addEventListener("click", () => startBankCheckout(buyBank));
+    buyRow.append(buyBtc, buyBank);
+    b.append(buyRow);
     // 결제 «전»에 보여야 하는 것 — 약관·환불 규정(전자상거래법 표시 사항). 링크는 새 탭으로 연다(상자가 닫히지 않게).
     const agree = el("div", "pass-agree");
     const a1 = el("a", "", "이용약관"); a1.href = "terms.html"; a1.target = "_blank";
@@ -209,6 +242,27 @@ async function startCheckout(btn) {
   }
 }
 
+async function startBankCheckout(btn) {
+  btn.disabled = true;
+  say("pass-msg", "주문을 만드는 중…");
+  try {
+    const r = await fetch(`${API}/bank-order`, { method: "POST" });
+    if (r.status === 503) {
+      btn.hidden = true;
+      say("pass-msg", "지금은 계좌이체를 쓸 수 없습니다. 비트코인으로 결제해 주세요.");
+      return;
+    }
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.claim || !d.order_no || !d.bank) throw new Error(String(r.status));
+    addClaim(d.claim, { order_no: d.order_no, amount_krw: d.amount_krw, bank: d.bank, expires_at: d.expires_at });
+    stopPolling();
+    draw();
+  } catch (e) {
+    btn.disabled = false;
+    say("pass-msg", "주문을 만들지 못했습니다. 잠시 뒤 다시 시도해 주세요.");
+  }
+}
+
 async function enterCode(code, btn) {
   if (!code) return;
   btn.disabled = true;
@@ -234,7 +288,7 @@ async function enterCode(code, btn) {
 // 찾기표를 전부 확인한다. 지우는 것은 서버가 «모른다»고 분명히 답한 것뿐이다 —
 // 연결이 끊기거나 서버가 오류를 내면 그대로 두고 다음에 다시 묻는다.
 async function checkClaims() {
-  let trouble = false;
+  let trouble = false, expired = false;
   for (const c of claims()) {
     let r, d;
     try {
@@ -253,6 +307,18 @@ async function checkClaims() {
       return;
     }
     if (d.status === "unknown") dropClaim(c.t);
+    if (d.status === "expired") { dropClaim(c.t); expired = true; }
+  }
+  // 만료는(2시간짜리 활성 폴링 창을 지나 3일 뒤에나 나오는 것이 보통이다) 발견하면 즉시 알린다 —
+  // ready 가 그러듯, 조용한 배경 확인이었어도 상자를 열어 보여 준다.
+  if (expired) {
+    stopPolling();
+    const owned = ownedCode();
+    if (owned) renderOwned(owned.code, owned.exp, false);
+    else renderShop("입금 기한이 지나 주문이 취소되었습니다. 입금하셨다면 주문번호와 입금한 날을 문의처로 알려 주세요.");
+    link.textContent = ownedCode() ? "이용권" : "1년 이용권";
+    open(true);
+    return;
   }
   if (waitingClaims().length) {
     say("pass-status", trouble ? "연결이 잠시 끊겼습니다. 30초 뒤 다시 확인합니다." : `마지막 확인 ${new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}`);
