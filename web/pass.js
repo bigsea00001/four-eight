@@ -209,7 +209,7 @@ function renderShop(message) {
     const agree = el("div", "pass-agree");
     const a1 = el("a", "", "이용약관"); a1.href = "terms.html"; a1.target = "_blank";
     const a2 = el("a", "", "환불 규정"); a2.href = "refund.html"; a2.target = "_blank";
-    agree.append("결제하면 ", a1, "과 ", a2, "에 동의한 것으로 봅니다. 결제가 확인되고 7일 안에는 이유를 묻지 않고 전액 환불해 드립니다. 하루 10건 · 한 달 100건까지 질문할 수 있습니다. 14세 미만은 이용할 수 없습니다.");
+    agree.append("결제하면 ", a1, "과 ", a2, "에 동의한 것으로 봅니다. 결제가 확인되고 7일 안에 AI 점술가를 한 번도 쓰지 않으셨다면 전액 환불해 드립니다 — 질문을 한 번이라도 보내면 이용이 시작되어 단순 변심 환불이 제한됩니다. 하루 10건 · 한 달 100건까지 질문할 수 있습니다. 14세 미만은 이용할 수 없습니다.");
     b.append(agree);
   } else {
     b.append(el("div", "btitle", "1년 이용권"));
@@ -251,7 +251,8 @@ function saveReceipt(code, exp, rc) {
     `결제 확인   ${rc.settled_at}`,
     `이용 기간   ${ymd(rc.settled_at)} ~ ${ymd(exp)}`,
     `이용권 코드 ${code}`, "",
-    "환불        결제 확인 후 7일 안에는 이유를 묻지 않고 전액 환불합니다.",
+    "환불        결제 확인 후 7일 안, AI 점술가를 한 번도 쓰지 않았다면 전액 환불합니다.",
+    "            질문을 보내면 이용이 시작되어 단순 변심 환불은 제한됩니다.",
     "            https://fe.eet.kr/refund.html",
     "약관        https://fe.eet.kr/terms.html", "",
     "판매자      주식회사 브이로프 · 사업자등록번호 433-88-02526",
