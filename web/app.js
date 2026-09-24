@@ -356,11 +356,15 @@ function buildFacts(c, topicLabel) {
   return L.join("\n").slice(0, 3500);
 }
 
+// 이용권 코드가 이 기기에 있는가(pass.js 가 저장한 것). 저장소가 막힌 창이면 없다고 본다.
+function hasPassCode() { try { return !!localStorage.getItem("fe_pass_code"); } catch (e) { return false; } }
+
 function renderConsult(c) {
   const chips = CONSULT_TOPICS.map(([k, label]) =>
     `<button class="ctopic" data-k="${k}" data-label="${label}">${label}</button>`).join("");
   return `<div class="block">
     <div class="btitle">AI 점술가 <span class="lab">명식을 바탕으로 고민을 풀어 드립니다</span></div>
+    ${hasPassCode() ? "" : `<div class="cnote ctrial">🎁 이용권이 없어도 <b>무료 체험 1회</b>로 질문 하나를 보내 보실 수 있습니다. 체험도 이용으로 셉니다(환불 규정 2항).</div>`}
     <div class="cnote">🔒 사주 계산은 이 기기 안에서 끝났습니다. 상담을 보내면 <b>계산된 명식 기호와 적으신 고민만</b> 서버로 갑니다. 생년월일시 원본은 나가지 않습니다.</div>
     <div class="ctopics">${chips}</div>
     <div class="cbox" id="cbox"></div>
@@ -477,6 +481,13 @@ function setupConsult(c, root) {
       if (r.cid) cid = r.cid;
       // 서버가 이용권을 요구하면 이용권 상자를 연다(pass.js 가 받는다).
       if (r.flags && r.flags.need_pass) { sendEvent("need_pass"); dispatchEvent(new CustomEvent("fe-pass:need")); }
+      // 무료 체험으로 받은 답 — 답 아래에 한 줄. 남은 체험이 있으면 그 수를 알린다.
+      if (r.flags && r.flags.trial) {
+        const left = Number(r.flags.trial_left) || 0;
+        cBubble(box, "sys", left > 0 ? `무료 체험으로 답변드렸습니다. 체험이 ${left}번 더 남았습니다.`
+                                    : "무료 체험으로 답변드렸습니다. 다음 질문부터는 1년 이용권이 필요합니다.");
+        const t = panel.querySelector(".ctrial"); if (t) t.remove();
+      }
       if (!r.text) bubble.textContent = "잠시 답변이 어렵습니다. 잠시 뒤 다시 시도해 주세요.";
     } catch (e) {
       bubble.textContent = "연결에 실패했습니다. 잠시 뒤 다시 시도해 주세요.";
