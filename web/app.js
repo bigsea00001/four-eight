@@ -647,6 +647,7 @@ async function saveYear2027Card(c, c2027, btn, msgEl) {
     const canvas = await buildYear2027Canvas(c, c2027);
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
     if (!blob) throw new Error("no-blob");
+    sendEvent("share_card");
     const file = new File([blob], "fe-eet-kr-2027-정미년.png", { type: "image/png" });
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
       try {
@@ -695,6 +696,7 @@ function buildIcs() {
 }
 
 function downloadIcs() {
+  sendEvent("ics");
   const blob = new Blob([buildIcs()], { type: "text/calendar;charset=utf-8" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
@@ -749,7 +751,11 @@ function render(c, c2027) {
     buttons.forEach(b => b.classList.toggle("active", b.dataset.t === key));
     pans.forEach(p => p.classList.toggle("on", p.dataset.p === key));
   };
-  buttons.forEach(b => b.addEventListener("click", () => activate(b.dataset.t)));
+  // 「2027」 탭을 열 때만 계측한다 — 다른 탭은 세지 않는다.
+  buttons.forEach(b => b.addEventListener("click", () => {
+    activate(b.dataset.t);
+    if (b.dataset.t === "y2027") sendEvent("season_tab");
+  }));
   // 기본 탭 — 시간운이 있으면 오늘, 없으면 명식.
   activate(t ? "today" : "chart");
   setupConsult(c, el);
