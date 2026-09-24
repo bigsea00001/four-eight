@@ -16,10 +16,10 @@ body { margin:0; background:var(--paper); color:var(--ink);
   word-break:keep-all; overflow-wrap:break-word; }
 .bar { display:flex; align-items:center; gap:.6rem; max-width:46rem; margin:0 auto;
   padding:1rem 1.25rem; font-size:.85rem; color:var(--ink-soft); }
-.bar .mark { font-family:"AppleMyungjo","Nanum Myeongjo",serif; font-size:1.2rem; color:var(--cinnabar); letter-spacing:.08em; text-decoration:none; }
+.bar .mark { font-family:"Noto Serif KR","AppleMyungjo","Nanum Myeongjo",serif; font-size:1.2rem; color:var(--cinnabar); letter-spacing:.08em; text-decoration:none; }
 .bar .name { font-weight:650; color:var(--ink); text-decoration:none; }
 main { max-width:46rem; margin:0 auto; padding:0 1.25rem 3rem; }
-h1 { font-family:"AppleMyungjo","Nanum Myeongjo",serif; font-size:1.6rem; margin:.4rem 0 .1rem; }
+h1 { font-family:"Noto Serif KR","AppleMyungjo","Nanum Myeongjo",serif; font-size:1.6rem; margin:.4rem 0 .1rem; }
 .effective { color:var(--ink-faint); font-size:.85rem; margin:0 0 1.1rem; }
 .callout { background:var(--surface); border:1px solid var(--line); border-left:3px solid var(--cinnabar);
   border-radius:10px; padding:.8rem 1rem; font-size:.95rem; margin-bottom:1.2rem; }

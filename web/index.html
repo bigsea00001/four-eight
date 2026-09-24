@@ -10,12 +10,19 @@
 <meta property="og:title" content="사주 명식 — 브라우저에서 바로 계산">
 <meta property="og:description" content="생년월일시를 넣으면 브라우저 안(WebAssembly)에서 사주 명식을 계산합니다. 네 기둥·오행·신살과 근거 규칙 해석까지. 생년월일시는 이 기기를 벗어나지 않습니다.">
 <meta property="og:url" content="https://fe.eet.kr/">
-<meta name="twitter:card" content="summary">
+<meta property="og:image" content="https://fe.eet.kr/assets/og.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://fe.eet.kr/assets/og.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600;700&display=swap" rel="stylesheet">
 <!--
   이 페이지는 소개 페이지(../index.html)와 같은 팔레트·글꼴을 씁니다.
   색 변수는 앱 DesignSystem.swift에서 온 것을 소개 페이지가 이미 옮겨 둔 값이라,
   그대로 다시 선언만 합니다 — 눈으로 새로 고르지 않습니다.
   오행 색(목청·화적·토황·금백·수흑)은 명리에서 의미가 있는 색이라 유지합니다.
+  제목 글꼴은 Google Fonts Noto Serif KR(굵기 2개, display=swap)이고, 뒤의 AppleMyungjo·
+  Nanum Myeongjo는 그 글꼴이 아직 안 실렸거나 차단됐을 때의 대체입니다.
 -->
 <style>
   :root {
@@ -23,6 +30,13 @@
     --ink-faint:#9A9083; --line:#E2D9C9; --cinnabar:#B43A2E; --code-bg:#ECE5D8;
     /* 오행 — 앱 팔레트 그대로 */
     --wood:#00876B; --fire:#EE7038; --earth:#7F5502; --metal:#8898EC; --water:#2E4E9C;
+    /* 히어로(첫 화면 밤 풍경) 바탕 — 먹빛 남색 → 차콜. OS 모드와 무관하게 고정이다.
+       이미지가 아직 없거나 못 받아 오면 이 그라디언트만 보인다. */
+    --hero-1:#161A30; --hero-2:#2A2521;
+    --overlay: rgba(20,16,10,.5);
+    --shadow: rgba(20,16,10,.3);
+    /* 입력 카드가 히어로에 겹칠 때 쓰는 들림 — 라이트는 옅은 그림자, 다크는 얇은 선만(그림자 없음) */
+    --card-lift: 0 20px 44px -14px rgba(20,16,10,.32);
     color-scheme: light dark;
   }
   @media (prefers-color-scheme: dark) {
@@ -30,33 +44,90 @@
       --paper:#1B1917; --surface:#262320; --ink:#E8E1D6; --ink-soft:#ABA294;
       --ink-faint:#7C7365; --line:#3A352F; --cinnabar:#D05A48; --code-bg:#302B26;
       --wood:#0F9078; --fire:#E56636; --earth:#95670A; --metal:#8898EC; --water:#6866D4;
+      --overlay: rgba(0,0,0,.6);
+      --shadow: rgba(0,0,0,.45);
+      --card-lift: none;
     }
   }
   * { box-sizing:border-box; }
+  html { scroll-behavior:smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior:auto; } }
   body { margin:0; background:var(--paper); color:var(--ink);
     font:16px/1.7 -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", system-ui, sans-serif;
     word-break:keep-all; overflow-wrap:break-word; }
-  .hanja { font-family:"AppleMyungjo","Nanum Myeongjo",serif; }
+  .hanja { font-family:"Noto Serif KR","AppleMyungjo","Nanum Myeongjo",serif; }
   main { max-width:46rem; margin:0 auto; padding:0 1.25rem 4rem; }
   .bar { display:flex; align-items:center; gap:.6rem; max-width:46rem; margin:0 auto;
     padding:1rem 1.25rem; font-size:.85rem; color:var(--ink-soft); }
   .bar .mark { font-size:1.2rem; color:var(--cinnabar); letter-spacing:.08em; }
   .bar .name { font-weight:650; color:var(--ink); }
   .bar a { margin-left:auto; color:var(--cinnabar); text-decoration:none; font-size:.85rem; }
-  h1 { font-family:"AppleMyungjo","Nanum Myeongjo",serif; font-size:1.7rem; margin:.4rem 0 .2rem; letter-spacing:-.01em; }
-  .sub { color:var(--ink-soft); font-size:.92rem; margin-bottom:1rem; }
-  .privacy { background:color-mix(in srgb, var(--wood) 10%, var(--surface));
-    border:1px solid color-mix(in srgb, var(--wood) 30%, var(--line));
-    color:var(--wood); font-size:.83rem; padding:.6rem .8rem; border-radius:9px; margin-bottom:1.1rem; }
-  .form { display:flex; flex-wrap:wrap; gap:.5rem; align-items:flex-end;
-    background:var(--surface); border:1px solid var(--line); border-radius:13px; padding:1rem; }
-  .fld { display:flex; flex-direction:column; gap:.25rem; }
-  .fld label { font-size:.72rem; color:var(--ink-soft); }
-  .fld input, .fld select { font-size:1rem; padding:.5rem .55rem; border:1px solid var(--line);
-    border-radius:8px; background:var(--paper); color:var(--ink); width:4.6rem; }
-  #go { margin-left:auto; background:var(--cinnabar); color:#fff; border:0; border-radius:9px;
-    padding:.65rem 1.3rem; font-size:1rem; font-weight:600; cursor:pointer; }
+  h1 { font-family:"Noto Serif KR","AppleMyungjo","Nanum Myeongjo",serif; margin:0; letter-spacing:-.01em; }
+  /* 첫 화면 히어로 — 밤 풍경 이미지 한 곳(달이 보이는 자리). OS 밝음/어두움과 무관하게 항상 이 모습이다.
+     이미지가 없거나 못 받으면(onerror) img를 숨기고 --hero-1→--hero-2 그라디언트만 남는다.
+     상단 바는 이 위에 투명하게 겹치고, 글줄은 달·산 실루엣을 피해 빈 하늘 쪽(위에서 약 36%)에 앉힌다. */
+  .hero { position:relative; overflow:hidden; height:min(78vh, 680px); margin-bottom:-3.4rem;
+    background:linear-gradient(160deg, var(--hero-1), var(--hero-2)); }
+  .hero-pic, .hero-img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block;
+    object-position: 24% 15%; }
+  .hero-scrim { position:absolute; inset:0;
+    background:linear-gradient(180deg, rgba(10,12,20,.1) 0%, rgba(10,12,20,.32) 40%, rgba(10,12,20,.7) 100%); }
+  .hero-mist { position:absolute; inset:-15% -10%;
+    background:
+      radial-gradient(40% 30% at 22% 78%, rgba(238,232,218,.14), transparent 70%),
+      radial-gradient(30% 22% at 78% 28%, rgba(238,232,218,.10), transparent 70%);
+    animation: hero-mist-drift 34s ease-in-out infinite alternate; }
+  @keyframes hero-mist-drift { from { transform:translate(-2%, 0); } to { transform:translate(2%, -1.5%); } }
+  @media (prefers-reduced-motion: reduce) { .hero-mist { animation:none; } }
+  /* 상단 바 — 히어로 위에 겹친다(투명·미색 글자). 스크롤에 따라오지 않아도 된다. */
+  .hero-bar { position:absolute; top:0; left:0; right:0; z-index:3; }
+  .hero-bar .mark, .hero-bar .name, .hero-bar a { color:#F5F1E8; text-shadow:0 1px 5px rgba(8,9,16,.6); }
+  .hero-content { position:absolute; left:0; right:0; top:36%; z-index:2; max-width:46rem; margin:0 auto; width:100%;
+    box-sizing:border-box; padding:0 1.25rem; }
+  .hero-eyebrow { font-family:"Noto Serif KR","AppleMyungjo","Nanum Myeongjo",serif;
+    font-size:.85rem; letter-spacing:.4em; color:rgba(251,247,238,.78); margin:0 0 .7rem;
+    text-shadow:0 1px 5px rgba(8,9,16,.6); }
+  .hero-content h1 { color:#FBF7EE; font-size:clamp(2.1rem, 5vw, 3.4rem); line-height:1.25;
+    text-shadow:0 2px 10px rgba(8,9,16,.5); }
+  .hero-sub { margin:.8rem 0 0; color:#E7E0D2; font-size:.98rem; line-height:1.65; max-width:32rem;
+    text-shadow:0 1px 6px rgba(8,9,16,.55); }
+  .hero-cta { display:inline-block; margin-top:1.4rem; background:var(--cinnabar); color:#fff;
+    text-decoration:none; font-weight:600; font-size:.98rem; padding:.75rem 1.6rem; border-radius:999px;
+    box-shadow:0 10px 26px rgba(8,9,16,.35); }
+  .hero-cta:hover { filter:brightness(1.08); }
+  @media (max-width:640px) {
+    .hero { height:min(74vh, 620px); margin-bottom:-2.4rem; }
+    .hero-pic, .hero-img { object-position: 50% 12%; }
+    .hero-content { top:32%; }
+    .hero-eyebrow { font-size:.72rem; letter-spacing:.32em; }
+    .hero-sub { font-size:.92rem; }
+  }
+  /* 입력 카드 — main 이 히어로 아래쪽에 살짝 겹치도록 hero 쪽에서 음수 margin-bottom 을 준다(위 참고).
+     #pass 상자가 열려 있을 때는 그 상자가 대신 겹치고, 닫혀 있으면 이 카드가 겹친다 — 한 번에 하나만 겹치므로
+     입력 카드가 다른 상자 위로 올라와 클릭을 가로채는 일이 없다. */
+  .form { position:relative; display:flex; flex-direction:column; gap:1.15rem;
+    background:var(--surface); border:1px solid var(--line); border-radius:20px; padding:1.4rem 1.4rem 1.6rem;
+    box-shadow:var(--card-lift); }
+  .fgroup { border:0; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:.6rem; min-width:0; }
+  .fgroup legend { flex:1 0 100%; padding:0; font-size:.72rem; color:var(--ink-faint); margin-bottom:.4rem; }
+  .fld { flex:1; min-width:3.6rem; display:flex; flex-direction:column; gap:.3rem; }
+  .fld label { font-size:.75rem; color:var(--ink-soft); }
+  .fld input, .fld select { font-size:1rem; height:44px; padding:0 .6rem; border:1px solid var(--line);
+    border-radius:9px; background:var(--paper); color:var(--ink); width:100%; }
+  .fld select { appearance:none; -webkit-appearance:none; -moz-appearance:none; padding-right:1.9rem;
+    background-image:
+      linear-gradient(45deg, transparent 50%, var(--ink-soft) 50%),
+      linear-gradient(135deg, var(--ink-soft) 50%, transparent 50%);
+    background-position: calc(100% - 17px) calc(50% - 2px), calc(100% - 12px) calc(50% - 2px);
+    background-size: 5px 5px, 5px 5px; background-repeat:no-repeat; }
+  .fhelp { flex-basis:100%; font-size:.75rem; color:var(--ink-faint); margin-top:-.15rem; }
+  #go { background:var(--cinnabar); color:#fff; border:0; border-radius:11px;
+    padding:.75rem 1.3rem; font-size:1rem; font-weight:600; cursor:pointer; width:100%; height:48px; }
   #go:hover { filter:brightness(1.08); }
+  .form-privacy { margin:0; font-size:.8rem; color:var(--ink-soft); line-height:1.5; }
+  @media (max-width:640px) {
+    .form { border-radius:18px; padding:1.2rem 1.1rem 1.4rem; }
+  }
   #status { font-size:.8rem; color:var(--ink-soft); margin:.7rem .2rem; min-height:1rem; }
   /* 로딩 안내 (스피너 + 임시 문구) */
   #loading { display:none; align-items:center; gap:.7rem; background:var(--surface);
@@ -84,7 +155,7 @@
   .ch { display:block; font-size:1.9rem; font-weight:600; line-height:1.1; }
   .kr { display:block; font-size:.7rem; opacity:.8; }
   .palja { text-align:center; font-size:1.25rem; letter-spacing:2px; margin:.7rem 0 .2rem; }
-  .block { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:.8rem 1rem; margin-top:.9rem; }
+  .block { background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:1.1rem 1.3rem; margin-top:.9rem; }
   .btitle { font-size:.85rem; font-weight:600; margin-bottom:.7rem; }
   .oheng { display:flex; gap:.6rem; align-items:flex-end; height:6rem; }
   .obar { flex:1; display:flex; flex-direction:column; align-items:center; gap:.25rem; height:100%; justify-content:flex-end; }
@@ -96,20 +167,23 @@
   .chip.strong { background:var(--cinnabar); color:#fff; border-color:var(--cinnabar); }
   .chip.rel { background:color-mix(in srgb, var(--water) 12%, var(--surface));
     border-color:color-mix(in srgb, var(--water) 30%, var(--line)); color:var(--water); }
-  .sec { margin-bottom:.8rem; }
-  .sec-t { font-family:"AppleMyungjo","Nanum Myeongjo",serif; font-size:.92rem; font-weight:600; color:var(--cinnabar); margin-bottom:.25rem; }
-  .sec-b { font-size:.9rem; line-height:1.65; color:var(--ink); }
+  .sec { margin-bottom:1.15rem; }
+  .sec:last-child { margin-bottom:0; }
+  .sec-t { font-family:"Noto Serif KR","AppleMyungjo","Nanum Myeongjo",serif; font-size:.92rem; font-weight:600; color:var(--cinnabar); margin-bottom:.4rem; }
+  .sec-b { font-size:.9rem; line-height:1.7; color:var(--ink); }
   /* 탭 — 오늘·이달·올해·명식·대운 */
   .tabs { display:flex; gap:.3rem; flex-wrap:wrap; margin:.2rem 0 1rem; border-bottom:1px solid var(--line); }
   .tab { appearance:none; background:none; border:0; border-bottom:2px solid transparent;
-    color:var(--ink-soft); font-size:.95rem; padding:.5rem .8rem; cursor:pointer; font-family:inherit; margin-bottom:-1px; }
+    color:var(--ink-soft); font-size:.95rem; padding:.5rem .8rem; cursor:pointer;
+    font-family:"Noto Serif KR","AppleMyungjo","Nanum Myeongjo",serif; margin-bottom:-1px; }
   .tab:hover { color:var(--ink); }
-  .tab.active { color:var(--cinnabar); border-bottom-color:var(--cinnabar); font-weight:650; }
+  .tab.active { color:var(--cinnabar); border-bottom-width:3px; border-bottom-color:var(--cinnabar); font-weight:650; }
   .panel { display:none; } .panel.on { display:block; }
   /* 간지 두 글자 블록(천간 위·지지 아래, 오행 색) */
   .gj { display:inline-flex; flex-direction:column; align-items:center; line-height:1.05; padding:.3rem .55rem; border-radius:10px; background:var(--code-bg); }
   .gj .gc { font-weight:600; }
-  .gj-lg .gc { font-size:2.6rem; } .gj-md .gc { font-size:1.6rem; } .gj-sm .gc { font-size:1.35rem; }
+  .gj-lg .gc { font-size:3rem; } .gj-md .gc { font-size:1.6rem; } .gj-sm .gc { font-size:1.35rem; }
+  .gj-lg { padding:.4rem .7rem; }
   /* 오늘·이달·올해 머리 카드 */
   .today-head { display:flex; gap:1rem; align-items:center; }
   .today-gj { flex:none; }
@@ -146,7 +220,8 @@
   .cb-me { align-self:flex-end; background:var(--cinnabar); color:#fff; border-bottom-right-radius:4px; }
   .cb-ai { align-self:flex-start; background:var(--surface); border:1px solid var(--line); border-bottom-left-radius:4px; }
   .cb-sys { align-self:center; background:transparent; color:var(--ink-soft); font-size:.82rem; }
-  .chotline { align-self:stretch; background:#fff6f5; border:1px solid var(--cinnabar); border-radius:12px; padding:.7rem .9rem; }
+  .chotline { align-self:stretch; background:color-mix(in srgb, var(--cinnabar) 6%, var(--surface));
+    border:1px solid var(--cinnabar); border-radius:12px; padding:.7rem .9rem; }
   .chotline p { margin:.25rem 0; font-size:.9rem; line-height:1.6; }
   .chotline p.num { font-weight:700; color:var(--cinnabar); }
   .cinput { display:flex; gap:.5rem; align-items:flex-end; }
@@ -154,8 +229,8 @@
   .cinput #csend { white-space:nowrap; padding:.6rem 1rem; border:0; border-radius:10px; background:var(--cinnabar); color:#fff; font-weight:600; cursor:pointer; }
   .cinput #csend:disabled { opacity:.5; cursor:default; }
   /* 전송 고지 모달 */
-  .cmodal-ov { position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; padding:1rem; z-index:100; }
-  .cmodal { background:var(--paper); border-radius:14px; max-width:30rem; width:100%; padding:1.3rem 1.4rem; max-height:90vh; overflow-y:auto; box-shadow:0 10px 40px rgba(0,0,0,.3); }
+  .cmodal-ov { position:fixed; inset:0; background:var(--overlay); display:flex; align-items:center; justify-content:center; padding:1rem; z-index:100; }
+  .cmodal { background:var(--paper); border-radius:14px; max-width:30rem; width:100%; padding:1.3rem 1.4rem; max-height:90vh; overflow-y:auto; box-shadow:0 10px 40px var(--shadow); }
   .cmodal h3 { margin:0 0 .5rem; font-size:1.05rem; }
   .cm-lead { font-size:.86rem; color:var(--ink-soft); margin:0 0 .9rem; line-height:1.55; }
   .cm-sec { margin-bottom:.8rem; }
@@ -193,45 +268,86 @@
   .pass-rcpt { font-size:.8rem; color:var(--ink-soft); margin-top:.6rem; }
   .pass-save { margin-top:.45rem; font-size:.8rem; padding:.3rem .7rem; }
   .pass-agree a { color:var(--ink-soft); }
-  /* 사업자 정보 — 이미지로 싣는다(봇 수집 방지 · vrof.co.kr 과 같은 방식). tools/bizinfo/ 가 만든다. */
-  .site-foot { max-width:46rem; margin:0 auto; padding:1.4rem 1.25rem 2.5rem; border-top:1px solid var(--line);
-    font-size:.8rem; color:var(--ink-soft); }
-  .site-foot nav { display:flex; flex-wrap:wrap; gap:.3rem .9rem; margin-bottom:.8rem; }
+  /* 사업자 정보 — 이미지로 싣는다(봇 수집 방지 · vrof.co.kr 과 같은 방식). tools/bizinfo/ 가 만든다.
+     무게를 덜기 위해 톤을 낮춘 옅은 띠로 감싸고, 데스크톱은 링크·이미지 두 칸으로 나눈다. */
+  .site-foot { background:color-mix(in srgb, var(--ink) 4%, var(--paper)); border-top:1px solid var(--line);
+    font-size:.8rem; color:var(--ink-faint); }
+  .site-foot-in { max-width:46rem; margin:0 auto; padding:1.6rem 1.25rem 2.2rem; }
+  .foot-grid { display:flex; flex-direction:column; gap:1.3rem; }
+  .site-foot nav { display:flex; flex-wrap:wrap; gap:.3rem .9rem; }
   .site-foot a { color:var(--ink-soft); }
+  .foot-label { font-size:.68rem; letter-spacing:.08em; color:var(--ink-faint); margin:0 0 .5rem; }
   .site-foot img { display:block; max-width:100%; height:auto; }
+  @media (min-width:641px) {
+    .foot-grid { flex-direction:row; justify-content:space-between; align-items:flex-start; gap:2rem; }
+    .foot-left { flex:1; padding-top:.2rem; }
+    .foot-right { flex:none; }
+  }
 </style>
 </head>
 <body>
-<div class="bar"><span class="mark hanja">四八</span><span class="name">FourEight</span><a href="#pass" id="passlink" aria-controls="pass" aria-expanded="false" hidden>1년 이용권</a></div>
+<div class="hero">
+  <picture class="hero-pic">
+    <source media="(max-width: 640px)" srcset="assets/hero-tall.webp">
+    <img class="hero-img" src="assets/hero-wide.webp" alt="" loading="eager" decoding="async"
+      onerror="this.style.display='none'">
+  </picture>
+  <div class="hero-scrim" aria-hidden="true"></div>
+  <div class="hero-mist" aria-hidden="true"></div>
+  <div class="bar hero-bar"><span class="mark hanja">四八</span><span class="name">FourEight</span><a href="#pass" id="passlink" aria-controls="pass" aria-expanded="false" hidden>1년 이용권</a></div>
+  <div class="hero-content">
+    <p class="hero-eyebrow hanja">四柱八字</p>
+    <h1>태어난 날의 기운을<br> 여덟 글자로 읽습니다</h1>
+    <p class="hero-sub">생년월일시를 넣으면 이 브라우저 안에서 명식을 계산해 오늘·이달·올해·대운을 풀어 드립니다.</p>
+    <a class="hero-cta" href="#start">내 사주 보기</a>
+  </div>
+</div>
 <main>
   <div id="pass" hidden></div>
-  <h1>사주 명식</h1>
-  <div class="sub">생년월일시를 넣으면 오늘·이달·올해·명식·대운을 탭으로 봅니다.</div>
-  <div class="privacy">🔒 계산은 전부 이 브라우저 안(WebAssembly)에서 일어납니다. 생년월일시는 서버로 전송되지 않습니다. 서버에서 받는 것은 계산 엔진과 규칙 파일뿐입니다.</div>
 
-  <div class="form">
-    <div class="fld"><label>연</label><input id="y" type="number" value="2000"></div>
-    <div class="fld"><label>월</label><input id="mo" type="number" value="1"></div>
-    <div class="fld"><label>일</label><input id="d" type="number" value="1"></div>
-    <div class="fld"><label>시 (비우면 미상)</label><input id="h" type="number" value="1"></div>
-    <div class="fld"><label>분</label><input id="mi" type="number" value="1"></div>
-    <div class="fld"><label>성별</label><select id="g"><option>남</option><option>여</option></select></div>
-    <div class="fld"><label>달력</label><select id="cal"><option>양력</option><option>음력</option></select></div>
+  <div class="form" id="start">
+    <fieldset class="fgroup">
+      <legend>생년월일</legend>
+      <div class="fld"><label>연</label><input id="y" type="number" value="2000"></div>
+      <div class="fld"><label>월</label><input id="mo" type="number" value="1"></div>
+      <div class="fld"><label>일</label><input id="d" type="number" value="1"></div>
+    </fieldset>
+    <fieldset class="fgroup">
+      <legend>태어난 시각</legend>
+      <div class="fld"><label>시</label><input id="h" type="number" value="1"></div>
+      <div class="fld"><label>분</label><input id="mi" type="number" value="1"></div>
+      <div class="fhelp">모르면 비워 두세요</div>
+    </fieldset>
+    <fieldset class="fgroup">
+      <legend>성별·달력</legend>
+      <div class="fld"><label>성별</label><select id="g"><option>남</option><option>여</option></select></div>
+      <div class="fld"><label>달력</label><select id="cal"><option>양력</option><option>음력</option></select></div>
+    </fieldset>
     <button id="go">사주 보기</button>
+    <p class="form-privacy">🔒 계산은 전부 이 브라우저 안(WebAssembly)에서 일어납니다. 생년월일시는 서버로 전송되지 않습니다. 서버에서 받는 것은 계산 엔진과 규칙 파일뿐입니다.</p>
   </div>
 
-  <div id="loading"><div class="spinner"></div><div class="txt"><b>사주 계산기를 준비하고 있습니다.</b><br><span id="loadmsg">약 18MB를 한 번만 받습니다. 다음부터는 즉시 열립니다.</span></div></div>
-  <div id="status"></div>
-  <div id="error" hidden></div>
-  <div id="result" hidden></div>
+  <div id="loading" aria-live="polite"><div class="spinner"></div><div class="txt"><b>사주 계산기를 준비하고 있습니다.</b><br><span id="loadmsg">약 18MB를 한 번만 받습니다. 다음부터는 즉시 열립니다.</span></div></div>
+  <div id="status" aria-live="polite"></div>
+  <div id="error" hidden aria-live="assertive"></div>
+  <div id="result" hidden aria-live="polite"></div>
 </main>
 <footer class="site-foot">
-  <nav><a href="terms.html">이용약관</a><a href="refund.html">환불 규정</a><a href="privacy.html"><b>개인정보처리방침</b></a></nav>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/bizinfo-dark.webp">
-    <img src="assets/bizinfo-light.webp" width="344" height="343" loading="lazy" decoding="async"
-      alt="사업자 정보 · 상호 주식회사 브이로프 · 대표이사 · 사업자등록번호 433-88-02526 · 통신판매업 신고번호 제2024-서울은평-0124호 · 주소 서울특별시 은평구 은평로13길 11-6, 303호 · 전화 070-8246-9001 · 이메일 contact (at) vrof.co.kr">
-  </picture>
+  <div class="site-foot-in">
+    <div class="foot-grid">
+      <div class="foot-left">
+        <nav><a href="terms.html">이용약관</a><a href="refund.html">환불 규정</a><a href="privacy.html"><b>개인정보처리방침</b></a></nav>
+      </div>
+      <div class="foot-right">
+        <p class="foot-label">사업자 정보</p>
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="assets/bizinfo-dark.webp">
+          <img src="assets/bizinfo-light.webp" width="344" height="343" loading="lazy" decoding="async"
+            alt="사업자 정보 · 상호 주식회사 브이로프 · 대표이사 · 사업자등록번호 433-88-02526 · 통신판매업 신고번호 제2024-서울은평-0124호 · 주소 서울특별시 은평구 은평로13길 11-6, 303호 · 전화 070-8246-9001 · 이메일 contact (at) vrof.co.kr">
+        </picture>
+      </div>
+    </div>
+  </div>
 </footer>
 <script type="module" src="app.js"></script>
 <script type="module" src="pass.js"></script>

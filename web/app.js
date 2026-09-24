@@ -13,6 +13,8 @@ const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
 // ?patch=0 이면 shim 버그 우회를 끕니다 — 크롬에서도 그 함정을 밟는지 보이기 위해서입니다.
 const PATCH = params.get("patch") !== "0";
+// ?debug=1 이면 #status 에 전송·컴파일 시간 같은 개발 기록을 보입니다. 평소엔 「계산 완료」만.
+const DEBUG = params.get("debug") === "1";
 
 // 오행 색은 앱 팔레트(CSS 변수)를 그대로 씁니다 — 명리에서 의미가 있는 색입니다.
 const ELEMENT_VAR = { "목":"--wood", "화":"--fire", "토":"--earth", "금":"--metal", "수":"--water" };
@@ -531,9 +533,13 @@ async function calculate() {
     const chart = await runSaju(readForm());
     const t1 = performance.now();
     render(chart);
-    const wire = (timings.wasmBytes/1024/1024).toFixed(1);
-    const first = timings.firstDone ? "" : ` · 최초 전체 ${((t1 - timings.t0)/1000).toFixed(2)}s`;
-    log(`완료 — 전송+압축해제 ${((timings.tFetch-timings.t0)/1000).toFixed(2)}s · 컴파일 ${((timings.tCompile-timings.tFetch)/1000).toFixed(2)}s · 계산 ${(t1-t0).toFixed(0)}ms (gzip 약 18MB 전송, ${wire}MB로 해제)${first}`);
+    if (DEBUG) {
+      const wire = (timings.wasmBytes/1024/1024).toFixed(1);
+      const first = timings.firstDone ? "" : ` · 최초 전체 ${((t1 - timings.t0)/1000).toFixed(2)}s`;
+      log(`완료 — 전송+압축해제 ${((timings.tFetch-timings.t0)/1000).toFixed(2)}s · 컴파일 ${((timings.tCompile-timings.tFetch)/1000).toFixed(2)}s · 계산 ${(t1-t0).toFixed(0)}ms (gzip 약 18MB 전송, ${wire}MB로 해제)${first}`);
+    } else {
+      log("계산 완료");
+    }
     timings.firstDone = true;
   } catch (e) {
     showError(e); log("오류");
