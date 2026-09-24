@@ -118,8 +118,26 @@ function renderPending() {
   const b = el("div", "block pass-card");
   if (bankClaim) {
     b.append(el("div", "btitle", "아래 계좌로 9,900원을 보내 주세요"));
-    b.append(copyRow(`${bankClaim.bank.name} ${bankClaim.bank.account} (예금주 ${bankClaim.bank.holder})`));
-    b.append(copyRow(`입금자명: ${bankClaim.order_no}`));
+    // 한 줄에 몰면 좁은 화면에서 「(예금주」 가운데서 끊긴다 — 항목마다 한 줄, 복사는 계좌번호·입금자명만.
+    const dl = el("dl", "pass-bank");
+    const row = (label, value, copyVal, strong) => {
+      const dt = el("dt", "", label), dd = el("dd", strong ? "strong" : "", value);
+      if (copyVal) {
+        const btn = el("button", "pass-btn-ghost pass-copy", "복사");
+        btn.addEventListener("click", async () => {
+          try { await navigator.clipboard.writeText(copyVal); btn.textContent = "복사됨"; }
+          catch (e) { btn.textContent = "길게 눌러 복사"; }
+        });
+        dd.append(btn);
+      }
+      dl.append(dt, dd);
+    };
+    row("은행", bankClaim.bank.name);
+    row("계좌번호", bankClaim.bank.account, bankClaim.bank.account.replace(/[^0-9]/g, ""));
+    row("예금주", bankClaim.bank.holder);
+    row("금액", "9,900원");
+    row("입금자명", bankClaim.order_no, bankClaim.order_no, true);
+    b.append(dl);
     b.append(el("div", "sec-b",
       "입금자명을 주문번호로 적어 주셔야 누가 보낸 돈인지 알 수 있습니다. " +
       "입금을 확인하면 이 화면에 코드가 나옵니다 — 영업일 기준 하루 안에 확인합니다. " +

@@ -277,6 +277,19 @@
   .pass-input { flex:1; min-width:10rem; font:1rem ui-monospace, SFMono-Regular, Menlo, monospace; padding:.45rem .6rem;
     border:1px solid var(--line); border-radius:8px; background:var(--paper); color:var(--ink); }
   .pass-msg:empty, .pass-status:empty { display:none; }
+  /* 계좌이체 안내 — 항목마다 한 줄 */
+  .pass-bank { display:grid; grid-template-columns:auto 1fr; gap:.45rem .9rem; margin:.4rem 0 .9rem;
+    padding:.8rem .95rem; border:1px solid var(--line); border-radius:12px; background:var(--paper); }
+  .pass-bank dt { color:var(--ink-soft); font-size:.85rem; align-self:center; }
+  .pass-bank dd { margin:0; display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;
+    font:600 1rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing:.02em; }
+  .pass-bank dd.strong { color:var(--cinnabar); font-size:1.1rem; }
+  .pass-copy { font:inherit; font-size:.78rem; font-weight:500; padding:.2rem .6rem; }
+  /* 결제 단추 둘 — 비트코인·계좌이체 */
+  .pass-buy-row { display:flex; gap:.6rem; flex-wrap:wrap; }
+  .pass-buy-row .pass-btn { flex:1 1 10rem; }
+  .pass-btn-bank { background:transparent; color:var(--cinnabar); border:1px solid var(--cinnabar); }
+  .pass-btn-bank:hover { background:color-mix(in srgb, var(--cinnabar) 8%, transparent); }
   .pass-agree { font-size:.78rem; color:var(--ink-soft); margin-top:.55rem; }
   .pass-rcpt { font-size:.8rem; color:var(--ink-soft); margin-top:.6rem; }
   .pass-save { margin-top:.45rem; font-size:.8rem; padding:.3rem .7rem; }
