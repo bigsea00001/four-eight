@@ -19,8 +19,10 @@ const WAIT_SCREEN_MS = 2 * 60 * 60 * 1000;
 const KEEP_MS = 7 * 24 * 60 * 60 * 1000;
 
 const params = new URLSearchParams(location.search);
-// 결제 서버가 준비되기 전까지 구매 단추는 ?pass=1 에서만 보인다. 준비되면 true 로 바꾼다.
-const BUY_OPEN = params.get("pass") === "1";
+const BUY_OPEN = true;                                   // 2026-09-24 공개(대표 지시 「모두 공개해」)
+// 비트코인은 노드 동기화가 끝나야 결제창이 만들어진다. 끝나면 true 로 바꾼다. ?pass=1 은 미리보기(시험)용.
+const BTC_READY = false;
+const BTC_OPEN = BTC_READY || params.get("pass") === "1";
 
 // localStorage 는 사생활 보호 창에서 막힐 수 있다 — 막혀도 화면은 돌아야 한다.
 const store = {
@@ -177,7 +179,8 @@ function renderShop(message) {
     buyBtc.addEventListener("click", () => startCheckout(buyBtc));
     const buyBank = el("button", "pass-btn pass-btn-bank", "계좌이체로 결제");
     buyBank.addEventListener("click", () => startBankCheckout(buyBank));
-    buyRow.append(buyBtc, buyBank);
+    if (BTC_OPEN) buyRow.append(buyBtc);
+    buyRow.append(buyBank);
     b.append(buyRow);
     // 결제 «전»에 보여야 하는 것 — 약관·환불 규정(전자상거래법 표시 사항). 링크는 새 탭으로 연다(상자가 닫히지 않게).
     const agree = el("div", "pass-agree");
