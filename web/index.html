@@ -30,13 +30,13 @@
     --ink-faint:#9A9083; --line:#E2D9C9; --cinnabar:#B43A2E; --code-bg:#ECE5D8;
     /* 오행 — 앱 팔레트 그대로 */
     --wood:#00876B; --fire:#EE7038; --earth:#7F5502; --metal:#8898EC; --water:#2E4E9C;
-    /* 히어로(첫 화면 밤 풍경) 바탕 — 먹빛 남색 → 차콜. OS 모드와 무관하게 고정이다.
+    /* 히어로(첫 화면 새벽 해돋이) 바탕 — 옅은 금빛 → 살구빛. 밝고 희망찬 쪽으로 고정이다.
        이미지가 아직 없거나 못 받아 오면 이 그라디언트만 보인다. */
-    --hero-1:#161A30; --hero-2:#2A2521;
+    --hero-1:#FCEACB; --hero-2:#F6C9A2;
     --overlay: rgba(20,16,10,.5);
     --shadow: rgba(20,16,10,.3);
     /* 입력 카드가 히어로에 겹칠 때 쓰는 들림 — 라이트는 옅은 그림자, 다크는 얇은 선만(그림자 없음) */
-    --card-lift: 0 20px 44px -14px rgba(20,16,10,.32);
+    --card-lift: 0 14px 30px -16px rgba(20,16,10,.22);
     color-scheme: light dark;
   }
   @media (prefers-color-scheme: dark) {
@@ -63,42 +63,55 @@
   .bar .name { font-weight:650; color:var(--ink); }
   .bar a { margin-left:auto; color:var(--cinnabar); text-decoration:none; font-size:.85rem; }
   h1 { font-family:"Noto Serif KR","AppleMyungjo","Nanum Myeongjo",serif; margin:0; letter-spacing:-.01em; }
-  /* 첫 화면 히어로 — 밤 풍경 이미지 한 곳(달이 보이는 자리). OS 밝음/어두움과 무관하게 항상 이 모습이다.
-     이미지가 없거나 못 받으면(onerror) img를 숨기고 --hero-1→--hero-2 그라디언트만 남는다.
-     상단 바는 이 위에 투명하게 겹치고, 글줄은 달·산 실루엣을 피해 빈 하늘 쪽(위에서 약 36%)에 앉힌다. */
+  /* 첫 화면 히어로 — 운해 위 해돋이. 「그림 창문」으로 본다 — OS 밝음/어두움과 무관하게 히어로
+     «안»은 항상 라이트 값으로 고정한다(글자·마크·받침 전부). 그림 자체가 밝은 새벽빛이라 다크 모드용
+     어둠·받침을 따로 만들면(3차 때 해봤다) 학이 가려지고 뜬 상자처럼 보인다 — 그래서 없앴다.
+     두 모드가 갈리는 자리는 히어로 «바깥», 즉 .hero-fade 가 녹아드는 바탕색(--paper)뿐이다.
+     이미지가 없거나 못 받으면(onerror) img를 숨기고 --hero-1→--hero-2 그라디언트만 남는다. */
   .hero { position:relative; overflow:hidden; height:min(78vh, 680px); margin-bottom:-3.4rem;
     background:linear-gradient(160deg, var(--hero-1), var(--hero-2)); }
   .hero-pic, .hero-img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block;
-    object-position: 24% 15%; }
-  .hero-scrim { position:absolute; inset:0;
-    background:linear-gradient(180deg, rgba(10,12,20,.1) 0%, rgba(10,12,20,.32) 40%, rgba(10,12,20,.7) 100%); }
-  .hero-mist { position:absolute; inset:-15% -10%;
-    background:
-      radial-gradient(40% 30% at 22% 78%, rgba(238,232,218,.14), transparent 70%),
-      radial-gradient(30% 22% at 78% 28%, rgba(238,232,218,.10), transparent 70%);
-    animation: hero-mist-drift 34s ease-in-out infinite alternate; }
-  @keyframes hero-mist-drift { from { transform:translate(-2%, 0); } to { transform:translate(2%, -1.5%); } }
-  @media (prefers-reduced-motion: reduce) { .hero-mist { animation:none; } }
-  /* 상단 바 — 히어로 위에 겹친다(투명·미색 글자). 스크롤에 따라오지 않아도 된다. */
+    object-position: 34% 44%; }
+  /* 해 쪽의 아주 느린 빛 번짐 — 위치는 실제 해 자리(가로형 약 42%,55%)에 맞춘다 */
+  .hero-glow { position:absolute; inset:0;
+    background: radial-gradient(26% 22% at 42% 55%, rgba(255,250,222,.55), transparent 70%);
+    animation: hero-glow-pulse 26s ease-in-out infinite alternate; mix-blend-mode:soft-light; }
+  @keyframes hero-glow-pulse { from { opacity:.55; } to { opacity:.9; } }
+  @media (prefers-reduced-motion: reduce) { .hero-glow { animation:none; opacity:.7; } }
+  /* 히어로 아래 끝을 «그 모드의» 페이지 바탕으로 녹인다 — 라이트는 한지빛, 다크는 차콜로 각각 녹는다.
+     두 모드가 실제로 갈리는 유일한 자리다. */
+  .hero-fade { position:absolute; left:0; right:0; bottom:0; height:22%;
+    background:linear-gradient(to bottom, transparent, var(--paper)); }
+  /* 상단 바 — 히어로 위에 겹친다(투명·«고정» 먹빛 글자 + «고정» 주사 마크). 다크에서도 색이 안 바뀐다. */
   .hero-bar { position:absolute; top:0; left:0; right:0; z-index:3; }
-  .hero-bar .mark, .hero-bar .name, .hero-bar a { color:#F5F1E8; text-shadow:0 1px 5px rgba(8,9,16,.6); }
-  .hero-content { position:absolute; left:0; right:0; top:36%; z-index:2; max-width:46rem; margin:0 auto; width:100%;
+  .hero-bar .mark { color:#B43A2E; text-shadow:0 1px 3px rgba(255,255,255,.5); }
+  .hero-bar .name, .hero-bar a { color:#2A251F; text-shadow:0 1px 3px rgba(255,255,255,.5); }
+  .hero-content { position:absolute; left:0; right:0; top:15%; z-index:2; max-width:46rem; margin:0 auto; width:100%;
     box-sizing:border-box; padding:0 1.25rem; }
+  /* 글자 줄 뒤에만 좁고 옅게 — 데스크톱은 해가 드러나야 하므로 받침을 글줄 폭에 바짝 붙이고 흐리게 낮췄다.
+     색은 항상 흰빛 고정(다크에서도 바뀌지 않는다) — 자리마다 대비를 픽셀로 재서 정한 불투명도다. */
+  .hero-content::before { content:""; position:absolute; top:-.6rem; left:-.9rem; right:-1rem; z-index:-1;
+    height:12.6rem; border-radius:22px;
+    background: rgba(255,253,246,.56); filter: blur(11px); }
   .hero-eyebrow { font-family:"Noto Serif KR","AppleMyungjo","Nanum Myeongjo",serif;
-    font-size:.85rem; letter-spacing:.4em; color:rgba(251,247,238,.78); margin:0 0 .7rem;
-    text-shadow:0 1px 5px rgba(8,9,16,.6); }
-  .hero-content h1 { color:#FBF7EE; font-size:clamp(2.1rem, 5vw, 3.4rem); line-height:1.25;
-    text-shadow:0 2px 10px rgba(8,9,16,.5); }
-  .hero-sub { margin:.8rem 0 0; color:#E7E0D2; font-size:.98rem; line-height:1.65; max-width:32rem;
-    text-shadow:0 1px 6px rgba(8,9,16,.55); }
-  .hero-cta { display:inline-block; margin-top:1.4rem; background:var(--cinnabar); color:#fff;
+    font-size:.85rem; letter-spacing:.4em; color:#6B6154; margin:0 0 .7rem;
+    text-shadow:0 1px 3px rgba(255,255,255,.5); }
+  .hero-content h1 { color:#2A251F; font-size:clamp(2.1rem, 4vw, 2.6rem); line-height:1.26;
+    text-shadow:0 1px 4px rgba(255,255,255,.45); }
+  .hero-sub { margin:.8rem 0 0; color:#5E5548; font-size:.98rem; line-height:1.65; max-width:32rem;
+    text-shadow:0 1px 4px rgba(255,255,255,.4); }
+  .hero-cta { display:inline-block; margin-top:1.4rem; background:#B43A2E; color:#fff;
     text-decoration:none; font-weight:600; font-size:.98rem; padding:.75rem 1.6rem; border-radius:999px;
-    box-shadow:0 10px 26px rgba(8,9,16,.35); }
+    box-shadow:0 10px 22px rgba(20,16,10,.22); }
   .hero-cta:hover { filter:brightness(1.08); }
   @media (max-width:640px) {
     .hero { height:min(74vh, 620px); margin-bottom:-2.4rem; }
-    .hero-pic, .hero-img { object-position: 50% 12%; }
-    .hero-content { top:32%; }
+    .hero-pic, .hero-img { object-position: 50% 38%; }
+    .hero-glow { background: radial-gradient(22% 16% at 50% 64%, rgba(255,250,222,.55), transparent 70%); }
+    .hero-content { top:24%; }
+    /* 모바일 라이트가 이미 좋다는 검수를 받았다 — 배치·받침 모두 그대로 둔다(색만 고정값으로 옮김) */
+    .hero-content::before { top:-1.2rem; left:-1.2rem; right:-1rem; bottom:-1rem; height:auto;
+      background: rgba(255,253,246,.93); filter: blur(18px); }
     .hero-eyebrow { font-size:.72rem; letter-spacing:.32em; }
     .hero-sub { font-size:.92rem; }
   }
@@ -292,13 +305,13 @@
     <img class="hero-img" src="assets/hero-wide.webp" alt="" loading="eager" decoding="async"
       onerror="this.style.display='none'">
   </picture>
-  <div class="hero-scrim" aria-hidden="true"></div>
-  <div class="hero-mist" aria-hidden="true"></div>
+  <div class="hero-glow" aria-hidden="true"></div>
+  <div class="hero-fade" aria-hidden="true"></div>
   <div class="bar hero-bar"><span class="mark hanja">四八</span><span class="name">FourEight</span><a href="#pass" id="passlink" aria-controls="pass" aria-expanded="false" hidden>1년 이용권</a></div>
   <div class="hero-content">
     <p class="hero-eyebrow hanja">四柱八字</p>
-    <h1>태어난 날의 기운을<br> 여덟 글자로 읽습니다</h1>
-    <p class="hero-sub">생년월일시를 넣으면 이 브라우저 안에서 명식을 계산해 오늘·이달·올해·대운을 풀어 드립니다.</p>
+    <h1>타고난 기운을 알면,<br> 내일이 가벼워집니다</h1>
+    <p class="hero-sub">생년월일시를 넣으면 이 브라우저 안에서 명식을 계산해 오늘·이달·올해·대운의 흐름을 풀어 드립니다.</p>
     <a class="hero-cta" href="#start">내 사주 보기</a>
   </div>
 </div>
