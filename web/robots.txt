@@ -1,0 +1,7 @@
+# fe.eet.kr — 사주 명식
+User-agent: *
+Allow: /
+# 이용권 API 와 관리자 페이지는 수집하지 않는다.
+Disallow: /api/
+
+Sitemap: https://fe.eet.kr/sitemap.xml
