@@ -10,8 +10,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="legal.css">
-<!-- PostHog 방문 분석 — 설정·가린 자리는 posthog.js 머리 주석에 있다. -->
-<script src="posthog.js" defer></script>
+<!-- PostHog 방문 분석 — consent.js 가 켠다(유럽 방문자는 동의 뒤에만). 설정·가린 자리는 posthog.js·consent.js 머리 주석에 있다. -->
+<script src="consent.js" data-tools="posthog" defer></script>
 </head>
 <body>
 <div class="bar"><a class="mark" href="/">四八</a><a class="name" href="/">FourEight</a></div>
@@ -79,7 +79,7 @@
   <p>문의 — <a class="mail" data-u="contact" data-d="vrof.co.kr" href="#">contact (at) vrof.co.kr</a> · 전화 070-8246-9001 · <a href="https://vrof.co.kr" target="_blank" rel="noopener">vrof.co.kr</a></p>
 </main>
 <footer>
-  <a href="/">← 사주 명식으로 돌아가기</a> · <a href="refund.html">환불 규정</a> · <a href="privacy.html">개인정보처리방침</a><br>
+  <a href="/">← 사주 명식으로 돌아가기</a> · <a href="refund.html">환불 규정</a> · <a href="privacy.html">개인정보처리방침</a><span data-consent-reopen hidden> · </span><br>
   © 주식회사 브이로프
 </footer>
 <script>

@@ -335,8 +335,8 @@
   .y27-consult-link { color:var(--cinnabar); font-weight:600; text-decoration:none; }
   .y27-consult-link:hover { text-decoration:underline; }
 </style>
-<!-- PostHog 방문 분석 — 설정·가린 자리는 posthog.js 머리 주석에 있다. -->
-<script src="posthog.js" defer></script>
+<!-- PostHog 방문 분석 — consent.js 가 켠다(유럽 방문자는 동의 뒤에만). 설정·가린 자리는 posthog.js·consent.js 머리 주석에 있다. -->
+<script src="consent.js" data-tools="posthog" defer></script>
 </head>
 <body>
 <div class="hero">
@@ -390,7 +390,7 @@
   <div class="site-foot-in">
     <div class="foot-grid">
       <div class="foot-left">
-        <nav><a href="terms.html">이용약관</a><a href="refund.html">환불 규정</a><a href="privacy.html"><b>개인정보처리방침</b></a></nav>
+        <nav><a href="terms.html">이용약관</a><a href="refund.html">환불 규정</a><a href="privacy.html"><b>개인정보처리방침</b></a><span data-consent-reopen hidden></span></nav>
       </div>
       <div class="foot-right">
         <p class="foot-label">사업자 정보</p>
