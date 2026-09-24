@@ -27,6 +27,13 @@ const timings = {};
 const log = (m) => { $("status").textContent = m; };
 const showLoading = (on) => { $("loading").classList.toggle("on", on); };
 
+// 방문 계측 — 이름만 보낸다. 생년월일시나 상담 내용은 실리지 않는다. 실패해도 조용히 넘어간다.
+function sendEvent(e) {
+  if (DEBUG || location.hostname === "localhost") return;
+  try { navigator.sendBeacon("/api/pass/event", new Blob([JSON.stringify({ e })], { type: "application/json" })); }
+  catch (err) { /* 조용히 무시 */ }
+}
+
 function buildFds(stdout, stderr) {
   const root = new Map();
   root.set("rules", new Directory(new Map([["rules.json", new File(rulesBytes)]])));
@@ -442,6 +449,7 @@ function setupConsult(c, root) {
     }
     if (!topicLabel) { cBubble(box, "sys", "먼저 위에서 상담 주제를 하나 골라 주세요."); return; }
     const ok = await askConsent(); if (!ok) return;
+    sendEvent("consult_send");
 
     busy = true; send.disabled = true;
     cBubble(box, "me", text); q.value = "";
@@ -456,7 +464,7 @@ function setupConsult(c, root) {
       const r = await streamConsult(body, bubble);
       if (r.cid) cid = r.cid;
       // 서버가 이용권을 요구하면 이용권 상자를 연다(pass.js 가 받는다).
-      if (r.flags && r.flags.need_pass) dispatchEvent(new CustomEvent("fe-pass:need"));
+      if (r.flags && r.flags.need_pass) { sendEvent("need_pass"); dispatchEvent(new CustomEvent("fe-pass:need")); }
       if (!r.text) bubble.textContent = "잠시 답변이 어렵습니다. 잠시 뒤 다시 시도해 주세요.";
     } catch (e) {
       bubble.textContent = "연결에 실패했습니다. 잠시 뒤 다시 시도해 주세요.";
@@ -533,6 +541,7 @@ async function calculate() {
     const chart = await runSaju(readForm());
     const t1 = performance.now();
     render(chart);
+    sendEvent("calc");
     if (DEBUG) {
       const wire = (timings.wasmBytes/1024/1024).toFixed(1);
       const first = timings.firstDone ? "" : ` · 최초 전체 ${((t1 - timings.t0)/1000).toFixed(2)}s`;

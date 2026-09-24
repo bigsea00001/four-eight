@@ -1,10 +1,11 @@
 // 1년 이용권 — 구매 · 결제 뒤 코드 받기 · 코드 입력.
-// 사주 계산(app.js)과 따로 둔다. 이 파일이 서버와 주고받는 것은 이용권 찾기표와 코드뿐이다.
+// 사주 계산(app.js)과 따로 둔다. 이 파일이 서버와 주고받는 것은 이용권 찾기표·코드와 방문 계측 이름뿐이다.
 //
 //   POST /api/pass/checkout   → { checkout_url, claim }   비트코인 결제창 주소와 찾기표
 //   POST /api/pass/bank-order → { order_no, claim, amount_krw, bank, expires_at }   무통장입금 계좌 안내
 //   GET  /api/pass/claim?token= → pending | ready(code, expires_at) | expired | unknown
 //   POST /api/pass/verify { code } → { valid, expires_at }
+//   POST /api/pass/event { e } → 방문 계측 한 건(쿠키·IP 저장 없음, sendBeacon 로 조용히 보낸다)
 //
 // 찾기표는 결제창으로 떠나기 «전»에(비트코인) 또는 주문을 만들자마자(무통장입금) 저장한다.
 // BTCPay 가 돌려보내는 주소(?claim=)에만 기대면 결제 뒤 창을 닫은 사람은 코드를 받을 길이 없다.
@@ -60,6 +61,14 @@ const ymd = (iso) => {
   const d = new Date(iso);
   return isNaN(d) ? String(iso || "") : `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
 };
+
+// 방문 계측 — 이름만 보낸다. 쿠키·IP 는 이 코드가 다루지 않는다(서버도 저장하지 않는다).
+// 실패해도 조용히 넘어간다 — 계측이 화면 동작을 막으면 안 된다.
+function sendEvent(e) {
+  if (params.get("debug") === "1" || location.hostname === "localhost") return;
+  try { navigator.sendBeacon("/api/pass/event", new Blob([JSON.stringify({ e })], { type: "application/json" })); }
+  catch (err) { /* 조용히 무시 */ }
+}
 
 function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -256,6 +265,7 @@ async function startCheckout(btn) {
     const d = await r.json().catch(() => ({}));
     if (!r.ok || !d.checkout_url || !d.claim) throw new Error(String(r.status));
     addClaim(d.claim);                     // 떠나기 전에 먼저 적는다
+    sendEvent("checkout_btc");
     location.href = d.checkout_url;
   } catch (e) {
     btn.disabled = false;
@@ -276,6 +286,7 @@ async function startBankCheckout(btn) {
     const d = await r.json().catch(() => ({}));
     if (!r.ok || !d.claim || !d.order_no || !d.bank) throw new Error(String(r.status));
     addClaim(d.claim, { order_no: d.order_no, amount_krw: d.amount_krw, bank: d.bank, expires_at: d.expires_at });
+    sendEvent("checkout_bank");
     stopPolling();
     draw();
   } catch (e) {
@@ -296,6 +307,7 @@ async function enterCode(code, btn) {
       if (!store.set(K_CODE, code) || !store.set(K_EXP, d.expires_at)) memCode = { code, exp: d.expires_at };
       renderOwned(code, d.expires_at, false);
       link.textContent = "이용권";
+      sendEvent("code_ok");
     } else {
       say("pass-msg", "맞지 않거나 기간이 끝난 코드입니다. 다시 확인해 주세요.");
     }
@@ -386,8 +398,16 @@ if (returned && addClaim(returned)) {
   history.replaceState(null, "", location.pathname + (q ? "?" + q : "") + location.hash);
 }
 
+sendEvent("view");
+
 const owned = !!ownedCode(), pending = claims().length > 0, waiting = waitingClaims().length > 0;
-link.addEventListener("click", (e) => { e.preventDefault(); if (box.hidden) draw(); open(box.hidden); });
+link.addEventListener("click", (e) => {
+  e.preventDefault();
+  const willOpen = box.hidden;
+  if (box.hidden) draw();
+  open(box.hidden);
+  if (willOpen) sendEvent("pass_open");
+});
 if (BUY_OPEN || owned || pending) {
   link.hidden = false;
   link.textContent = owned ? "이용권" : "1년 이용권";
