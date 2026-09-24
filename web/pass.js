@@ -344,7 +344,7 @@ function saveReceipt(code, exp, rc) {
   const lines = [
     "구매 확인서 — FourEight 사주(fe.eet.kr) 1년 이용권", "",
     "상품        AI 점술가 1년 이용권 (하루 10건 · 한 달 100건)",
-    `금액        ${Number(rc.amount_krw).toLocaleString("ko-KR")}원 (부가가치세 포함) · 비트코인 결제`,
+    `금액        ${Number(rc.amount_krw).toLocaleString("ko-KR")}원 (부가가치세 포함) · ${String(rc.invoice_id || "").startsWith("BANK:") ? "계좌이체" : "비트코인"} 결제`,
     `결제 번호   ${rc.invoice_id}`,
     `결제 확인   ${rc.settled_at}`,
     `이용 기간   ${ymd(rc.settled_at)} ~ ${ymd(exp)}`,

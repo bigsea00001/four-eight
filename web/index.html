@@ -56,7 +56,7 @@
     font:16px/1.7 -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", system-ui, sans-serif;
     word-break:keep-all; overflow-wrap:break-word; }
   .hanja { font-family:"Noto Serif KR","AppleMyungjo","Nanum Myeongjo",serif; }
-  main { max-width:46rem; margin:0 auto; padding:0 1.25rem 4rem; }
+  main { position:relative; z-index:1; max-width:46rem; margin:0 auto; padding:0 1.25rem 4rem; }
   .bar { display:flex; align-items:center; gap:.6rem; max-width:46rem; margin:0 auto;
     padding:1rem 1.25rem; font-size:.85rem; color:var(--ink-soft); }
   .bar .mark { font-size:1.2rem; color:var(--cinnabar); letter-spacing:.08em; }
@@ -72,7 +72,8 @@
      맨 위가 히어로 박스 안쪽(이미지·번짐·페이드 자리)과 겹치는데, 그 자리에 놓이는 상호작용
      요소(시즌 띠 등)가 이 배경들에 클릭을 뺏기지 않도록 막아 둔다. 실제로 눌러야 하는
      .hero-bar·.hero-content만 아래에서 도로 켠다. */
-  .hero { position:relative; overflow:hidden; height:min(78vh, 680px); margin-bottom:-3.4rem;
+  /* 히어로를 한 층으로 묶는다(z-index:0). 안쪽 z-index 가 문서 전체로 새어 나와 겹쳐 올린 입력 카드의 윗부분(구매 상자 제목)을 덮었다. */
+  .hero { position:relative; z-index:0; isolation:isolate; overflow:hidden; height:min(78vh, 680px); margin-bottom:-3.4rem;
     pointer-events:none;
     background:linear-gradient(160deg, var(--hero-1), var(--hero-2)); }
   .hero-pic, .hero-img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block;
