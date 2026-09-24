@@ -108,6 +108,20 @@ function renderOwned(code, exp, fresh) {
     "이 코드가 이용권입니다. 다른 기기나 브라우저에서는 이 코드를 넣으면 됩니다. " +
     "따로 적어 두세요. 잃어버리셨다면 결제에 쓴 비트코인 거래 번호로 다시 찾아 드립니다.");
   b.append(keep);
+
+  // 선물 카드 — 코드가 그대로 이용권이므로, 선물하면 이 기기와 코드를 나눠 쓰게 된다는 것을 먼저 알린다.
+  // 🔴 .pass-save 는 "구매 확인서 저장" 전용 셀렉터다(있으면 결제한 코드라는 뜻) — 시험이 그것으로 구매 여부를
+  // 가린다. 선물 카드는 결제 여부와 무관하게 항상 보이므로 클래스를 빌리지 않고 인라인 스타일로 같은 모양만 낸다.
+  b.append(el("div", "fine",
+    "이 코드를 선물하면 받는 분과 함께 쓰게 됩니다 — 이 기기의 이용권도 같은 코드이기 때문입니다. " +
+    "각자 따로 쓰려면 새로 하나 더 구매해 주세요."));
+  const gift = el("button", "pass-btn-ghost pass-gift", "선물 카드로 저장");
+  gift.style.marginTop = ".45rem";
+  gift.style.fontSize = ".8rem";
+  gift.style.padding = ".3rem .7rem";
+  gift.addEventListener("click", () => saveGiftCard(code, exp, gift));
+  b.append(gift);
+
   box.append(b);
 }
 
@@ -251,6 +265,152 @@ function saveReceipt(code, exp, rc) {
   a.download = `fe-eet-kr-구매확인서-${rc.invoice_id}.txt`;
   document.body.append(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// ── 선물 카드 ───────────────────────────────────────────────────────────
+// 코드가 곧 이용권이므로, 이 카드에는 코드와 만료일만 싣는다.
+// 🔴 결제 번호·금액·구매자 정보는 절대 넣지 않는다 — 이 카드는 남에게 건네질 수 있다.
+
+const GIFT_W = 1080, GIFT_H = 1350;
+
+function loadImageSafe(src) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null); // 이미지 없이도 카드는 만들어진다
+    img.src = src;
+  });
+}
+
+// 한글은 띄어쓰기 단위로만 끊는다(word-break:keep-all 과 같은 생각).
+function wrapCentered(ctx, text, cx, y, maxWidth, lineHeight) {
+  const words = text.split(" ");
+  const lines = [];
+  let line = "";
+  for (const w of words) {
+    const test = line ? line + " " + w : w;
+    if (line && ctx.measureText(test).width > maxWidth) { lines.push(line); line = w; }
+    else line = test;
+  }
+  if (line) lines.push(line);
+  lines.forEach((l, i) => ctx.fillText(l, cx, y + i * lineHeight));
+  return y + lines.length * lineHeight;
+}
+
+async function buildGiftCanvas(code, exp) {
+  const canvas = document.createElement("canvas");
+  canvas.width = GIFT_W; canvas.height = GIFT_H;
+  const ctx = canvas.getContext("2d");
+  const cx = GIFT_W / 2;
+
+  const PAPER = "#FAF7F0", INK = "#2A251F", INK_SOFT = "#6B6154", INK_FAINT = "#9A9083",
+    CINNABAR = "#B43A2E", SURFACE = "#FFFFFF", LINE = "#E2D9C9";
+
+  ctx.fillStyle = PAPER;
+  ctx.fillRect(0, 0, GIFT_W, GIFT_H);
+
+  // 위쪽 한지 이미지 — 세로가 훨씬 긴 원본이라 카드 상단 띠 높이만큼만 잘라 보인다.
+  const BANNER_H = 620;
+  const hero = await loadImageSafe("assets/hero-tall.webp");
+  if (hero) {
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0, 0, GIFT_W, BANNER_H); ctx.clip();
+    const h = GIFT_W * (hero.height / hero.width);
+    ctx.drawImage(hero, 0, 0, GIFT_W, h);
+    ctx.restore();
+    const fade = ctx.createLinearGradient(0, BANNER_H - 180, 0, BANNER_H);
+    fade.addColorStop(0, "rgba(250,247,240,0)");
+    fade.addColorStop(1, PAPER);
+    ctx.fillStyle = fade;
+    ctx.fillRect(0, BANNER_H - 180, GIFT_W, 180);
+  }
+
+  // 글꼴이 실려 있어야 그릴 때 바로 반영된다 — 실패해도 대체 글꼴로 그려진다.
+  try {
+    await document.fonts.load('700 56px "Noto Serif KR"');
+    await document.fonts.load('700 30px "Noto Serif KR"');
+  } catch (e) { /* 대체 글꼴로 진행 */ }
+
+  ctx.textAlign = "center";
+
+  ctx.fillStyle = CINNABAR;
+  ctx.font = '700 84px "Noto Serif KR", "AppleMyungjo", "Nanum Myeongjo", serif';
+  ctx.fillText("四八", cx, 700);
+
+  ctx.fillStyle = INK;
+  ctx.font = '700 42px "Noto Serif KR", "AppleMyungjo", "Nanum Myeongjo", serif';
+  ctx.fillText("FourEight 사주 · 1년 이용권 선물", cx, 768);
+
+  // 코드 상자
+  const boxW = 900, boxH = 130, boxY = 830;
+  ctx.fillStyle = SURFACE;
+  ctx.strokeStyle = LINE; ctx.lineWidth = 2;
+  roundRect(ctx, cx - boxW / 2, boxY, boxW, boxH, 16);
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = INK;
+  ctx.font = '700 58px ui-monospace, "SFMono-Regular", Menlo, monospace';
+  ctx.fillText(code, cx, boxY + boxH / 2 + 20);
+
+  // 쓰는 법
+  ctx.fillStyle = INK_SOFT;
+  ctx.font = '30px -apple-system, "Pretendard", "Apple SD Gothic Neo", sans-serif';
+  wrapCentered(ctx, "fe.eet.kr 에서 위쪽 「이용권」을 눌러 이 코드를 넣으면 AI 점술가 상담을 1년 동안 쓸 수 있습니다.",
+    cx, 1040, 860, 44);
+
+  // 만료일
+  ctx.fillStyle = INK_FAINT;
+  ctx.font = '28px -apple-system, "Pretendard", sans-serif';
+  ctx.fillText(`${ymd(exp)}까지 씁니다`, cx, 1230);
+
+  ctx.font = '600 24px -apple-system, "Pretendard", sans-serif';
+  ctx.fillStyle = CINNABAR;
+  ctx.fillText("fe.eet.kr", cx, 1290);
+
+  return canvas;
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+async function saveGiftCard(code, exp, btn) {
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "카드 만드는 중…";
+  try {
+    const canvas = await buildGiftCanvas(code, exp);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+    if (!blob) throw new Error("no-blob");
+    const file = new File([blob], `fe-eet-kr-선물카드-${code}.png`, { type: "image/png" });
+
+    // 휴대폰이면 공유 시트를 먼저 시도한다 — 메시지·카카오톡으로 바로 건넬 수 있다.
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: "FourEight 사주 1년 이용권 선물" });
+        return;
+      } catch (e) {
+        if (e && e.name === "AbortError") return; // 사용자가 공유를 취소한 것 — 대신 저장하지 않는다
+        // 공유가 지원된다고 했는데 실패했으면 저장으로 대신한다
+      }
+    }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = file.name;
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  } catch (e) {
+    btn.textContent = "만들지 못했습니다";
+    setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 2000);
+    return;
+  }
+  btn.textContent = original;
+  btn.disabled = false;
 }
 
 const say = (id, text) => { const e = document.getElementById(id); if (e) e.textContent = text; };
