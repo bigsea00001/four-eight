@@ -35,7 +35,10 @@
     }
     var hc = window.hillConsent;
     var config = {
-        api_host: 'https://us.i.posthog.com',
+        // 리버스 프록시(2026-09-26): 광고 차단기가 posthog.com 주소를 막아 기록이 빠지던 것 — 우리 주소 /ingest 로 보낸다.
+        // 서버 nginx 의 fe.eet.kr 설정에 /ingest location 이 먼저 들어가 있어야 한다(없으면 기록이 끊긴다).
+        api_host: '/ingest',
+        ui_host: 'https://us.posthog.com', // 툴바·세션 녹화 링크 등 PostHog 화면으로 가는 주소
         defaults: '2026-05-30',
         person_profiles: 'identified_only',
         session_recording: {
